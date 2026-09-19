@@ -1,0 +1,12 @@
+# IDE / 编辑器
+.idea/
+.vscode/
+*.iml
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# Python / 临时
+__pycache__/
+*.pyc
