@@ -548,12 +548,37 @@ test:
     <h3 style="margin-top:0">C3 · 多路复用器与 HCL case 表达式</h3>
     <p>位级 MUX（图 4-11：s 为 1 输出 a，为 0 输出 b）：</p>
     <pre>bool out = (s &amp;&amp; a) || (!s &amp;&amp; b);</pre>
-    <p>字级选择用 <b>case 表达式</b>：方括号包裹若干"<code class="mono">选择表达式 : 值;</code>"，<b>从上到下第一个成立者胜出</b>，最后的 <code class="mono">1 : …</code> 是默认分支。计算三个字 A、B、C 最小值的正文示例（练习题 4.11 所指代码，共 4 个 X&lt;=Y 比较）：</p>
-    <pre>word Min3 = [
-    A &lt;= B &amp;&amp; A &lt;= C : A;    <span class="c"># 2 个比较：A&lt;=B、A&lt;=C</span>
-    B &lt;= A &amp;&amp; B &lt;= C : B;    <span class="c"># 2 个比较：B&lt;=A、B&lt;=C</span>
+    <p>字级选择用 <b>case 表达式</b>。一句话读法：<b>输出 = 从上到下第一个条件成立的那个字</b>。通用形状：</p>
+    <pre>word Out = [
+    选择表达式1 : 字级表达式1;
+    选择表达式2 : 字级表达式2;
+    …
+    1           : 兜底表达式;    <span class="c"># 1 恒真，必选中的默认分支</span>
+];</pre>
+    <p>以练习题 4.11 的 Min3 为例（正文原代码，含 4 个 X&lt;=Y 比较），与 C 逐行对照：</p>
+    <div class="grid2">
+      <div>
+        <pre>word Min3 = [
+    A &lt;= B &amp;&amp; A &lt;= C : A;    <span class="c"># 2 个比较</span>
+    B &lt;= A &amp;&amp; B &lt;= C : B;    <span class="c"># 2 个比较</span>
     1                : C;    <span class="c"># 否则选 C</span>
 ];</pre>
+        <p class="small muted" style="margin-top:2px">HCL case 表达式</p>
+      </div>
+      <div>
+        <pre>if      (A&lt;=B &amp;&amp; A&lt;=C) out = A;
+else if (B&lt;=A &amp;&amp; B&lt;=C) out = B;
+else                   out = C;</pre>
+        <p class="small muted" style="margin-top:2px">等价的 C——像 if / else if 链，不像 switch</p>
+      </div>
+    </div>
+    <p><b>三个关键语义</b>：</p>
+    <ul>
+      <li><b>自上而下、第一个为真者胜</b>——和 C 的 switch 完全不同：case 的"标签"是<b>任意布尔表达式</b>（不是常量），且天然只选一路、不需要 break。更像 if / else if 链或嵌套三目运算符。</li>
+      <li><b>最后的 <code class="mono">1 : …</code> 是 else</b>：1 恒真、走到必选中，所以必须放最后——放前面会短路掉后面所有分支。</li>
+      <li><b>它描述的是电路，不是语句序列</b>：<code class="mono">bool … = …</code> 输出一位信号，<code class="mono">word … = […]</code> 输出 64 位字；对应硬件是一个字级 MUX——所有选择条件<b>并行</b>求值，条件有重叠时，综合会给后面的分支加上"前面都没选中"的屏蔽，保证"第一个为真"的优先顺序。</li>
+    </ul>
+    <p class="note"><b>考点提醒</b>：每行末尾的分号不能少（<b>包括最后的默认分支</b>），整体方括号包裹、以 <code class="mono">];</code> 结束。呼应：4.10 的 64 位相等电路、4.11 的 Min3、4.12 的中间值，都是"条件并行求值 + MUX 选一路"的同一套路。顺带一提，等价改写自由——<code class="mono">xor</code> 既可以写 <code class="mono">(!a &amp;&amp; b) || (a &amp;&amp; !b)</code>（枚举两个成立项），也可以写 <code class="mono">!(a &amp;&amp; b) &amp;&amp; (a || b)</code>：后者做一次德摩根展开就是 <code class="mono">!eq</code>，直接体现 4.9 的结论。</p>
   </div>
 
   <div class="card" id="p410">
