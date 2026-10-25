@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CSAPP 第4章互动学习（4.1–4.2节）· 练习题 4.1/4.2/4.5/4.6/4.10/4.11</title>
+<style>
+  :root{
+    --bg:#f4f6fb; --card:#ffffff; --ink:#182034; --muted:#5b6474;
+    --line:#e3e8f2; --brand:#1d4ed8; --brand-weak:#eff4ff; --brand-line:#c9d8ff;
+    --ok:#15803d; --ok-bg:#ecfdf5; --bad:#b91c1c; --bad-bg:#fef2f2;
+    --warn:#92400e; --warn-bg:#fffbeb;
+    --code-bg:#f8faff; --code-ink:#1f2937; --shadow:0 1px 3px rgba(16,24,40,.06),0 8px 24px rgba(16,24,40,.05);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0f1420; --card:#171e2e; --ink:#e6eaf3; --muted:#9aa4ba;
+      --line:#2a3247; --brand:#7ea2ff; --brand-weak:#1c2740; --brand-line:#31406b;
+      --ok:#4ade80; --ok-bg:#12291e; --bad:#f87171; --bad-bg:#331717;
+      --warn:#fbbf24; --warn-bg:#2e2410;
+      --code-bg:#101828; --code-ink:#dbe4f5; --shadow:0 1px 3px rgba(0,0,0,.4);
+    }
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;
+    font-size:15px;line-height:1.8;}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 20px 80px}
+  a{color:var(--brand)}
+
+  /* ---- 顶部导航 ---- */
+  nav{position:sticky;top:0;z-index:50;background:color-mix(in srgb, var(--card) 88%, transparent);
+    backdrop-filter:blur(10px);border-bottom:1px solid var(--line);}
+  .navin{max-width:1060px;margin:0 auto;padding:8px 20px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .navin .ttl{font-weight:600;margin-right:8px;font-size:14px}
+  .navin a{font-size:13px;color:var(--muted);text-decoration:none;padding:3px 10px;border-radius:999px}
+  .navin a:hover{background:var(--brand-weak);color:var(--brand)}
+  .navin .prog{margin-left:auto;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px}
+  .pbar{width:110px;height:6px;border-radius:999px;background:var(--line);overflow:hidden}
+  .pbar>i{display:block;height:100%;width:0;background:var(--brand);border-radius:999px;transition:width .3s}
+
+  /* ---- 英雄区 ---- */
+  header.hero{background:linear-gradient(135deg,var(--brand-weak),var(--card) 65%);
+    border-bottom:1px solid var(--line);padding:40px 0 30px;margin-bottom:26px}
+  .hero .kick{font-size:12px;letter-spacing:3px;color:var(--brand);font-weight:600;margin-bottom:8px}
+  .hero h1{margin:0 0 10px;font-size:27px;line-height:1.4}
+  .hero p.sub{margin:0;color:var(--muted);max-width:760px}
+
+  /* ---- 通用块 ---- */
+  section{margin-top:34px}
+  h2{font-size:21px;margin:0 0 4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  h2 .chip{font-size:12px;font-weight:600;color:var(--brand);background:var(--brand-weak);
+    border:1px solid var(--brand-line);border-radius:999px;padding:1px 10px;letter-spacing:1px}
+  .hsub{color:var(--muted);font-size:13.5px;margin:0 0 14px}
+  h3{font-size:16.5px;margin:22px 0 8px}
+  p{margin:8px 0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:18px 20px;box-shadow:var(--shadow);margin:14px 0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:760px){.grid2{grid-template-columns:1fr}}
+  .note{border-left:4px solid var(--brand);background:var(--brand-weak);
+    border-radius:6px;padding:10px 14px;margin:12px 0;font-size:14px}
+  .warnbox{border-left:4px solid #d97706;background:var(--warn-bg);
+    border-radius:6px;padding:10px 14px;margin:12px 0;font-size:14px}
+  .muted{color:var(--muted)}
+  .small{font-size:13px}
+
+  pre{background:var(--code-bg);color:var(--code-ink);border:1px solid var(--line);
+    border-radius:10px;padding:12px 16px;overflow-x:auto;
+    font-family:Consolas,"Courier New","Microsoft YaHei",monospace;font-size:13.5px;line-height:1.65;margin:10px 0}
+  code{font-family:Consolas,"Courier New","Microsoft YaHei",monospace;font-size:.92em;
+    background:var(--code-bg);border:1px solid var(--line);border-radius:5px;padding:0 5px}
+  pre code{border:none;background:none;padding:0}
+  pre .c{color:#6a9955}          /* 注释 */
+  pre .k{color:var(--brand)}     /* 强调 */
+  @media (prefers-color-scheme: dark){ pre .c{color:#7fbf7f} }
+
+  table.tbl{width:100%;border-collapse:collapse;font-size:13.5px;margin:10px 0}
+  .tbl th,.tbl td{border:1px solid var(--line);padding:6px 10px;text-align:left;vertical-align:top}
+  .tbl th{background:var(--brand-weak);color:var(--ink);white-space:nowrap}
+  .tbl td.mono,.mono{font-family:Consolas,"Courier New","Microsoft YaHei",monospace}
+  .tbl .bytes{white-space:nowrap;letter-spacing:.4px}
+  .badrow td{background:var(--bad-bg)}
+  .posrow td{color:var(--muted);background:var(--brand-weak);font-size:12.5px}
+  .errmsg{color:var(--bad);font-size:12.5px;margin-top:2px}
+  .errline{color:var(--bad);background:var(--bad-bg);border-radius:6px;padding:6px 10px;margin:6px 0;font-size:13.5px}
+  .badge{display:inline-block;font-size:11.5px;font-weight:600;border-radius:999px;padding:0 9px;margin-right:6px;vertical-align:1px}
+  .badge.ok{color:var(--ok);background:var(--ok-bg);border:1px solid color-mix(in srgb,var(--ok) 30%,transparent)}
+  .badge.bad{color:var(--bad);background:var(--bad-bg);border:1px solid color-mix(in srgb,var(--bad) 30%,transparent)}
+
+  /* ---- 折叠解答 ---- */
+  details.sol{border:1px solid var(--brand-line);border-radius:12px;margin:12px 0;overflow:hidden;background:var(--card)}
+  details.sol summary{cursor:pointer;list-style:none;padding:11px 18px;font-weight:600;
+    background:var(--brand-weak);color:var(--brand);display:flex;gap:8px;align-items:center}
+  details.sol summary::-webkit-details-marker{display:none}
+  details.sol summary::after{content:"展开 ▾";margin-left:auto;font-size:12px;font-weight:400;color:var(--muted)}
+  details.sol[open] summary::after{content:"收起 ▴"}
+  details.sol .body{padding:6px 18px 14px}
+
+  /* ---- 工具 ---- */
+  textarea{width:100%;min-height:170px;background:var(--code-bg);color:var(--code-ink);
+    border:1px solid var(--line);border-radius:10px;padding:10px 12px;resize:vertical;
+    font-family:Consolas,"Courier New","Microsoft YaHei",monospace;font-size:13.5px;line-height:1.6}
+  textarea:focus{outline:2px solid var(--brand-line)}
+  button.btn{font:inherit;font-size:14px;font-weight:600;color:var(--card);background:var(--brand);
+    border:none;border-radius:9px;padding:8px 20px;cursor:pointer}
+  button.btn:hover{filter:brightness(1.08)}
+  button.btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--line);font-weight:400}
+  .toolrow{display:flex;gap:10px;align-items:center;margin:10px 0 4px;flex-wrap:wrap}
+  .seqcard{border:1px solid var(--line);border-radius:10px;padding:8px 12px 4px;margin:10px 0}
+  .seqhead{font-weight:600;font-size:13.5px;margin:2px 0 4px;color:var(--muted)}
+
+  /* ---- 知识点清单 ---- */
+  .kp{display:flex;gap:10px;align-items:flex-start;padding:7px 10px;border-radius:9px}
+  .kp:hover{background:var(--brand-weak)}
+  .kp input{margin-top:6px;width:16px;height:16px;accent-color:var(--brand);flex:none;cursor:pointer}
+  .kp label{cursor:pointer}
+  .kp input:checked + label{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--brand)}
+  .kpgrp{font-size:13px;font-weight:700;color:var(--brand);margin:14px 0 4px;letter-spacing:1px}
+
+  /* ---- 位演示 ---- */
+  .bitrow{display:flex;gap:6px;align-items:center;margin:7px 0;flex-wrap:wrap}
+  .bitrow .lbl{width:70px;font-size:13px;color:var(--muted);font-family:Consolas,monospace}
+  #bitsA,#bitsB,#bitsX{display:inline-flex;gap:6px;flex-wrap:wrap}
+  button.bit{width:38px;height:38px;border-radius:9px;border:1px solid var(--line);
+    background:var(--code-bg);color:var(--ink);font-family:Consolas,monospace;font-size:16px;cursor:pointer}
+  button.bit[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:#fff}
+  .xorcell{width:38px;height:30px;display:flex;align-items:center;justify-content:center;
+    border-radius:8px;font-family:Consolas,monospace;font-size:14px;border:1px dashed var(--line);color:var(--muted)}
+  .xorcell.hot{background:var(--warn-bg);color:var(--warn);border-style:solid;border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
+  .lamp{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;
+    padding:5px 16px;font-size:14px;font-weight:600;margin-right:10px}
+  .lamp i{width:11px;height:11px;border-radius:50%;background:var(--line);display:inline-block}
+  .lamp.on{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 40%,transparent)}
+  .lamp.on i{background:var(--ok)}
+  .lamp.off{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,transparent)}
+  .lamp.off i{background:var(--bad)}
+
+  footer{margin-top:50px;border-top:1px solid var(--line);padding-top:16px;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+
+<nav><div class="navin">
+  <span class="ttl">CSAPP 第4章 · 互动学习</span>
+  <a href="#scope">考试范围</a><a href="#map">知识点地图</a><a href="#sec41">§4.1 编码</a>
+  <a href="#asmtool">汇编器</a><a href="#dectool">反汇编器</a><a href="#sec45">absSum</a>
+  <a href="#sec42">§4.2 HCL</a><a href="#demo410">字相等演示</a>
+  <span class="prog"><span id="progText">已掌握 0/15</span><span class="pbar"><i id="progBar"></i></span></span>
+</div></nav>
+
+<header class="hero"><div class="wrap">
+  <div class="kick">深入理解计算机系统 · 原书第 3 版 · CHAPTER 4</div>
+  <h1>§4.1 指令集体系结构 ＆ §4.2 逻辑设计与 HCL<br>——本次作业知识点全程互动讲解</h1>
+  <p class="sub">覆盖练习题 4.1、4.2、4.5、4.6、4.10、4.11。页面完全离线可用：内置的 Y86-64 汇编器 / 反汇编器已按官方答案逐字节验证，边学边练。</p>
+</div></header>
+
+<div class="wrap">
+
+<!-- ================= 考试范围 ================= -->
+<section id="scope">
+  <h2>考试范围 <span class="chip">先明确范围</span></h2>
+  <p class="hsub">本次作业题目全部出自教材第 4 章的前两节。注意区分"节号"与"练习题编号"——两者重名，别混淆。</p>
+  <div class="grid2">
+    <div class="card">
+      <h3 style="margin-top:0">范围一 · 4.1 节 指令集体系结构</h3>
+      <p>Y86-64 处理器"程序员可见"的一切：程序寄存器与 PC、条件码、指令集、<b>字节编码</b>、异常状态 Stat。</p>
+      <p class="muted small">支撑练习题：<b>4.1</b>（汇编→编码）、<b>4.2</b>（编码→汇编）、<b>4.5 / 4.6</b>（用 Y86-64 改写 absSum）。</p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">范围二 · 4.2 节 逻辑设计和硬件控制语言 HCL</h3>
+      <p>逻辑门与布尔代数、位级组合电路（位相等 eq、异或、多路复用器 MUX）、<b>字级组合电路与 HCL case 表达式</b>。</p>
+      <p class="muted small">支撑练习题：<b>4.9</b>（xor 的 HCL，4.10 的引用对象）、<b>4.10</b>（64 位字级相等电路）、<b>4.11</b>（Min3 只用三次比较）。</p>
+    </div>
+  </div>
+  <div class="note">一句话记住归属：<b>练习题 4.1、4.2、4.5、4.6 出自 4.1 节；练习题 4.9～4.12 出自 4.2 节。</b>"练习题 4.2"考的是 4.1 节的指令编码，与"4.2 节"无关。</div>
+</section>
+
+<!-- ================= 知识点地图 ================= -->
+<section id="map">
+  <h2>知识点地图 <span class="chip">完成作业需要掌握什么</span></h2>
+  <p class="hsub">逐项勾选自查（进度自动保存在本机浏览器）。每一项都链接到下方对应讲解。</p>
+  <div class="card" style="padding:10px 16px">
+    <div class="kpgrp">A · Y86-64 与指令编码（支撑练习题 4.1 / 4.2）</div>
+    <div class="kp"><input type="checkbox" id="k1"><label for="k1">能说出 Y86-64 程序员可见状态：15 个寄存器、PC、条件码 ZF/SF/OF、Stat、内存 → <a href="#sec41">§A1</a></label></div>
+    <div class="kp"><input type="checkbox" id="k2"><label for="k2">记住 15 个寄存器的编号 0~E，且 F = 无寄存器（没有 %r15） → <a href="#regs">§A3</a></label></div>
+    <div class="kp"><input type="checkbox" id="k3"><label for="k3">会查指令编码总表：首字节 icode:ifun ＋ 寄存器字节 rA:rB ＋ valC → <a href="#enc">§A3</a></label></div>
+    <div class="kp"><input type="checkbox" id="k4"><label for="k4">记住四档长度 1 / 2 / 9 / 10，并用它核对编码与解码对齐 → <a href="#enc">§A3</a></label></div>
+    <div class="kp"><input type="checkbox" id="k5"><label for="k5">valC 一律 8 字节小端存放；负数用 64 位补码；空寄存器槽固定填 F → <a href="#enc">§A3</a></label></div>
+    <div class="kp"><input type="checkbox" id="k6"><label for="k6">会手工把 Y86-64 汇编编码成字节（练习题 4.1 题型） → <a href="#p41">练习题 4.1</a></label></div>
+    <div class="kp"><input type="checkbox" id="k7"><label for="k7">会手工解码并指出非法字节的位置（练习题 4.2 题型：icode 越界 / ifun 非法 / 寄存器槽非法 / 字节不足） → <a href="#p42">练习题 4.2</a></label></div>
+    <div class="kpgrp">B · 从 x86-64 翻译到 Y86-64（支撑练习题 4.5 / 4.6）</div>
+    <div class="kp"><input type="checkbox" id="k8"><label for="k8">知道参数传递约定（start 在 %rdi、count 在 %rsi）和图 4-6 sum 的"先跳 test"循环骨架 → <a href="#sec45">§B1</a></label></div>
+    <div class="kp"><input type="checkbox" id="k9"><label for="k9">记住关键差异：Y86-64 没有 testq/cmpq（只有 OPq 设条件码），没有 neg（取负要 0−x） → <a href="#sec45">§B2</a></label></div>
+    <div class="kp"><input type="checkbox" id="k10"><label for="k10">会用条件跳转实现 absSum（练习题 4.5） → <a href="#p45">练习题 4.5</a></label></div>
+    <div class="kp"><input type="checkbox" id="k11"><label for="k11">会用条件传送 cmovg 实现 absSum，并说清条件"反着用"的道理（练习题 4.6） → <a href="#p46">练习题 4.6</a></label></div>
+    <div class="kpgrp">C · HCL 与组合电路（支撑练习题 4.10 / 4.11，背景 4.9）</div>
+    <div class="kp"><input type="checkbox" id="k12"><label for="k12">会写位级 HCL 表达式：eq = (a&&b)||(!a&&!b)；xor = !eq（练习题 4.9） → <a href="#p49">练习题 4.9</a></label></div>
+    <div class="kp"><input type="checkbox" id="k13"><label for="k13">理解多路复用器与 HCL case 表达式（位级 bool 与字级 word 两种写法） → <a href="#caseexpr">§C3</a></label></div>
+    <div class="kp"><input type="checkbox" id="k14"><label for="k14">会设计 64 位字级相等电路：64 个 XOR ＋ 1 个 OR ＋ 1 个 NOT（练习题 4.10） → <a href="#p410">练习题 4.10</a></label></div>
+    <div class="kp"><input type="checkbox" id="k15"><label for="k15">会把 4 次比较的 Min3 重写成 3 次比较（练习题 4.11） → <a href="#p411">练习题 4.11</a></label></div>
+  </div>
+</section>
+
+<!-- ================= PART A ================= -->
+<section id="sec41">
+  <h2>A · Y86-64 程序员可见状态 <span class="chip">4.1 节</span></h2>
+  <p class="hsub">"程序员可见"＝写汇编 / 编码解码时必须知道的东西。内部流水线实现（SEQ/PIPE）不在本节范围内。</p>
+  <div class="card">
+    <table class="tbl">
+      <tr><th style="width:130px">状态部件</th><th>内容</th><th style="width:240px">与编码题的关系</th></tr>
+      <tr><td>程序寄存器</td><td>共 <b>15 个</b>：%rax %rcx %rdx %rbx %rsp %rbp %rsi %rdi %r8 ~ %r14（编号 0~E）</td><td>寄存器字节 rA:rB 按编号拼</td></tr>
+      <tr><td>PC</td><td>程序计数器，指向当前指令首字节</td><td>解码题里的"起始地址"</td></tr>
+      <tr><td>条件码</td><td>仅 ZF / SF / OF 三个，<b>只由 OPq（四则逻辑运算）设置</b></td><td>cmovXX / jXX 只读不写 → 4.5/4.6 要用 andq/subq 造条件</td></tr>
+      <tr><td>Stat</td><td>程序状态：AOK 正常 / HLT 停机 / ADR 地址非法 / INS 指令非法</td><td>非法字节 ⇒ INS（见 §A5 的四种非法）</td></tr>
+      <tr><td>内存</td><td>按字节寻址的虚拟内存，<b>小端序</b>（与 x86-64 一致）</td><td>valC 8 字节倒着放</td></tr>
+    </table>
+  </div>
+
+  <h3 id="enc">指令集与编码规则</h3>
+  <div class="card">
+    <p><b>每条指令的字节构成只有三段：</b>首字节 <code class="mono">icode:ifun</code>（高 4 位指令类，低 4 位变体）＋ 视需要加一个寄存器字节 <code class="mono">rA:rB</code> ＋ 视需要加 8 字节常数 <code class="mono">valC</code>。</p>
+    <table class="tbl">
+      <tr><th>指令</th><th>首字节</th><th>寄存器字节</th><th>valC（8 字节，小端）</th><th>长度</th></tr>
+      <tr><td class="mono">halt / nop / ret</td><td class="mono">0 0 / 1 0 / 9 0</td><td>—</td><td>—</td><td class="mono">1</td></tr>
+      <tr><td class="mono">rrmovq / cmovXX rA,rB</td><td class="mono">2 f</td><td class="mono">rA rB</td><td>—</td><td class="mono">2</td></tr>
+      <tr><td class="mono">irmovq V, rB</td><td class="mono">3 0</td><td class="mono">F rB</td><td class="mono">V</td><td class="mono">10</td></tr>
+      <tr><td class="mono">rmmovq rA, D(rB)</td><td class="mono">4 0</td><td class="mono">rA rB</td><td class="mono">D</td><td class="mono">10</td></tr>
+      <tr><td class="mono">mrmovq D(rB), rA</td><td class="mono">5 0</td><td class="mono">rA rB</td><td class="mono">D</td><td class="mono">10</td></tr>
+      <tr><td class="mono">addq/subq/andq/xorq</td><td class="mono">6 f（0/1/2/3）</td><td class="mono">rA rB</td><td>—</td><td class="mono">2</td></tr>
+      <tr><td class="mono">jXX Dest</td><td class="mono">7 f</td><td>—</td><td class="mono">Dest</td><td class="mono">9</td></tr>
+      <tr><td class="mono">call / ret</td><td class="mono">8 0 / 9 0</td><td>—</td><td class="mono">Dest / —</td><td class="mono">9 / 1</td></tr>
+      <tr><td class="mono">pushq / popq rA</td><td class="mono">A 0 / B 0</td><td class="mono">rA F</td><td>—</td><td class="mono">2</td></tr>
+    </table>
+    <p class="small muted">长度只有 1 / 2 / 9 / 10 四档——解码时靠它对齐，编码完靠它核对总数。</p>
+    <div class="grid2">
+      <div>
+        <h3 id="regs" style="margin-top:6px">寄存器编号（图 4.4）</h3>
+        <table class="tbl">
+          <tr><td class="mono">0 %rax</td><td class="mono">1 %rcx</td><td class="mono">2 %rdx</td><td class="mono">3 %rbx</td></tr>
+          <tr><td class="mono">4 %rsp</td><td class="mono">5 %rbp</td><td class="mono">6 %rsi</td><td class="mono">7 %rdi</td></tr>
+          <tr><td class="mono">8 %r8</td><td class="mono">9 %r9</td><td class="mono">A %r10</td><td class="mono">B %r11</td></tr>
+          <tr><td class="mono">C %r12</td><td class="mono">D %r13</td><td class="mono">E %r14</td><td class="mono"><b>F 无寄存器</b></td></tr>
+        </table>
+      </div>
+      <div>
+        <h3 style="margin-top:6px">功能码 fn</h3>
+        <table class="tbl">
+          <tr><th class="mono">fn</th><th>cmovXX / jXX</th><th class="mono">fn</th><th>OPq</th></tr>
+          <tr><td class="mono">0</td><td>无条件（rrmovq / jmp）</td><td class="mono">0</td><td class="mono">addq ＋</td></tr>
+          <tr><td class="mono">1</td><td class="mono">le ≤</td><td class="mono">1</td><td class="mono">subq −</td></tr>
+          <tr><td class="mono">2</td><td class="mono">l ＜</td><td class="mono">2</td><td class="mono">andq ＆</td></tr>
+          <tr><td class="mono">3</td><td class="mono">e ＝＝</td><td class="mono">3</td><td class="mono">xorq ⊕</td></tr>
+          <tr><td class="mono">4</td><td class="mono">ne ≠</td><td colspan="2" class="muted small">同一个 fn：接 2 是 cmovXX，接 7 是 jXX。<br>如 2 3 = cmove，7 3 = je。</td></tr>
+          <tr><td class="mono">5</td><td class="mono">ge ≥</td><td colspan="2"></td></tr>
+          <tr><td class="mono">6</td><td class="mono">g ＞</td><td colspan="2"></td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="note"><b>编码四步口诀：</b>① 查表写首字节 icode:ifun → ② 拼寄存器字节 rA:rB（<b>空槽填 F</b>，rA 恒在高位）→ ③ 常数转 64 位补码<b>按小端</b>拆 8 字节 → ④ 用长度四档核对总字节数。</div>
+    <p>手算示例 <code class="mono">rmmovq %rcx,-3(%rbx)</code>：</p>
+    <pre>40          ← icode 4, ifun 0（rmmovq）
+13          ← rA=%rcx=1（高 4 位）, rB=%rbx=3（低 4 位）
+fd ff ff ff ff ff ff ff  ← -3 的 64 位补码 = 0xFF…FD，小端 → 低位字节 fd 在前</pre>
+    <div class="warnbox"><b>Y86-64 没有</b>：%r15（F 是"无寄存器"不是第 16 个寄存器）、通用 movq、leaq、neg、imul、testq / cmpq、无符号条件族（ja/jb——因为根本没有 CF）。缺什么就用什么替代：testq %x,%x → <code class="mono">andq %x,%x</code>；neg → <code class="mono">0 − x</code>。</div>
+  </div>
+
+  <!-- ======== 工具：汇编器 ======== -->
+  <h3 id="asmtool">互动工具 · Y86-64 汇编器（练习题 4.1 题型）</h3>
+  <div class="card">
+    <p class="small muted">支持 .pos、标号（如 loop:）、# 注释、$立即数（十进制 / 0x 十六进制 / 负数）、D(%rB) 内存操作数。已按教材官方答案验证。</p>
+    <textarea id="asmIn" spellcheck="false">.pos 0x100    # Start code at address 0x100
+    irmovq $15,%rbx
+    rrmovq %rbx,%rcx
+loop:
+    rmmovq %rcx,-3(%rbx)
+    addq %rbx,%rcx
+    jmp loop</textarea>
+    <div class="toolrow">
+      <button class="btn" id="asmRun" type="button">汇编 → 字节</button>
+      <button class="btn ghost" id="asmReset" type="button">恢复练习题 4.1 原题</button>
+      <span class="small muted">试着把答案改成错的，看地址怎么变；或者自己写几条再核对。</span>
+    </div>
+    <div id="asmOut" aria-live="polite"></div>
+  </div>
+
+  <!-- ======== 练习题 4.1 ======== -->
+  <div class="card" id="p41">
+    <h3 style="margin-top:0">练习题 4.1 <span class="chip">4.1 节</span></h3>
+    <p>确定下面的 Y86-64 指令序列的字节编码。".pos 0x100" 那一行表明这段目标代码的起始地址应该是 0x100。</p>
+    <pre>.pos 0x100    <span class="c"># Start code at address 0x100</span>
+    irmovq $15,%rbx
+    rrmovq %rbx,%rcx
+loop:
+    rmmovq %rcx,-3(%rbx)
+    addq %rbx,%rcx
+    jmp loop</pre>
+    <details class="sol"><summary>参考解答与逐条讲解</summary><div class="body">
+      <table class="tbl">
+        <tr><th>地址</th><th>汇编</th><th>字节编码</th><th>怎么来的</th></tr>
+        <tr><td class="mono">0x100</td><td class="mono">irmovq $15,%rbx</td><td class="mono bytes">30 f3 0f 00 00 00 00 00 00 00</td><td>30=irmovq；rA 槽填 F、rB=%rbx=3 → <b>F3</b>；15 小端 → 0F 00…</td></tr>
+        <tr><td class="mono">0x10a</td><td class="mono">rrmovq %rbx,%rcx</td><td class="mono bytes">20 31</td><td>20=rrmovq；rA=%rbx=3（高）、rB=%rcx=1（低）→ 31</td></tr>
+        <tr><td class="mono">0x10c</td><td class="mono">loop:</td><td class="mono bytes">（标号，不占字节）</td><td>0x100＋10 ＋ 0x10a＋2 = 0x10c</td></tr>
+        <tr><td class="mono">0x10c</td><td class="mono">rmmovq %rcx,-3(%rbx)</td><td class="mono bytes">40 13 fd ff ff ff ff ff ff ff</td><td>40=rmmovq；rA=%rcx=1、rB=%rbx=3 → 13；−3 补码小端</td></tr>
+        <tr><td class="mono">0x116</td><td class="mono">addq %rbx,%rcx</td><td class="mono bytes">60 31</td><td>60=addq；rA=%rbx=3（高）、rB=%rcx=1（低）→ 31，<b>rA 恒在高位</b></td></tr>
+        <tr><td class="mono">0x118</td><td class="mono">jmp loop</td><td class="mono bytes">70 0c 01 00 00 00 00 00 00</td><td>70=jmp；loop=0x10c → 小端 0c 01 00…（<b>不是</b> 0x100！目标在 rmmovq 那里）</td></tr>
+      </table>
+      <div class="warnbox"><b>三个高频失分点</b>（书页手写笔记里就有前两个）：<br>① <code class="mono">rrmovq</code> 首字节是 <b>20</b>，别写成 40（40 是 rmmovq"寄存器→内存"）；<br>② 寄存器字节别拼反：<code class="mono">addq %rbx,%rcx</code> 是 31（rA=3 在高位），同 <code class="mono">rrmovq %rbx,%rcx</code> 的 31；<br>③ <code class="mono">jmp loop</code> 的目标是 loop 的地址 0x10c，不是 .pos 的 0x100。</div>
+    </div></details>
+  </div>
+
+  <!-- ======== 工具：反汇编器 ======== -->
+  <h3 id="dectool">互动工具 · Y86-64 反汇编器（练习题 4.2 题型）</h3>
+  <div class="card">
+    <p class="small muted">每行一个序列，格式 <code>A. 0x100: 30f3…</code>（也可以只贴十六进制串）。非法字节会标出<b>位置</b>和<b>原因</b>——正是练习题 4.2 要你回答的东西。</p>
+    <textarea id="decIn" spellcheck="false">A. 0x100: 30f3fcffffffffffffff40630008000000000000
+B. 0x200: a06f800c0200000000000030f30a0000000000000090
+C. 0x300: 5054070000000000000010f0b01f
+D. 0x400: 6113730004000000000000
+E. 0x500: 6362a0f0</textarea>
+    <div class="toolrow">
+      <button class="btn" id="decRun" type="button">反汇编 → 指令</button>
+      <button class="btn ghost" id="decReset" type="button">恢复练习题 4.2 原题</button>
+      <span class="small muted">改几个字节试试：把 20 改成 C0、把寄存器字节改成 F0，观察非法报告。</span>
+    </div>
+    <div id="decOut" aria-live="polite"></div>
+  </div>
+
+  <!-- ======== 练习题 4.2 ======== -->
+  <div class="card" id="p42">
+    <h3 style="margin-top:0">练习题 4.2 <span class="chip">4.1 节</span></h3>
+    <p>确定下列每个字节序列所编码的 Y86-64 指令序列。如果序列中有不合法的字节，指出指令序列中不合法值出现的位置。每个序列都先给出了起始地址，冒号，然后是字节序列。</p>
+    <pre>A. 0x100: 30f3fcffffffffffffff40630008000000000000
+B. 0x200: a06f800c0200000000000030f30a0000000000000090
+C. 0x300: 5054070000000000000010f0b01f
+D. 0x400: 6113730004000000000000
+E. 0x500: 6362a0f0</pre>
+    <details class="sol"><summary>参考解答（与上方工具输出一致，可自己先解再对答案）</summary><div class="body">
+      <table class="tbl">
+        <tr><th>序列</th><th>解码结果</th></tr>
+        <tr><td class="mono">A</td><td class="mono">0x100: irmovq $-4,%rbx<br>0x10a: rmmovq %rsi,0x800(%rbx)</td></tr>
+        <tr><td class="mono">B</td><td class="mono">0x200: pushq %rsi<br>0x202: call 0x20c<br>0x20b: irmovq $10,%rbx<br>0x215: ret</td></tr>
+        <tr><td class="mono">C</td><td class="mono">0x300: mrmovq 7(%rsp),%rbp<br>0x30a: nop<br>0x30b: <b>f0 → 非法</b>（icode = F，不在 0~B 内），解码终止</td></tr>
+        <tr><td class="mono">D</td><td class="mono">0x400: subq %rcx,%rbx<br>0x402: je 0x400</td></tr>
+        <tr><td class="mono">E</td><td class="mono">0x500: xorq %rsi,%rdx<br>0x502: pushq —— <b>寄存器字节 f0 非法</b>（rA 槽 = F"无寄存器"）</td></tr>
+      </table>
+      <div class="note"><b>四种"不合法"模式</b>，答题时按这个顺序检查：<br>① <b>icode 越界</b>：首字节高 4 位为 C~F（如 C 序列的 f0）→ 连长度都无法确定，解码只能到此为止；<br>② <b>寄存器槽出现 F</b>：F 只允许出现在 irmovq 的 rA 槽和 pushq/popq 的 rB 槽，其他位置都是非法（如 E 序列 a0 f0）；<br>③ <b>ifun 非法</b>：如 2f、6f、7f（cmov / OPq / jXX 的 fn 超出各自范围）；<br>④ <b>字节不足</b>：剩余字节撑不满一条完整指令。</div>
+      <div class="warnbox">B 序列的小陷阱：<code class="mono">call 0x20c</code> 的目标 0x20c 正好落在 irmovq 的立即数<b>内部</b>——合法编码≠合理程序，这也是"解码"与"执行"分开考的意义。</div>
+    </div></details>
+  </div>
+</section>
+
+<!-- ================= PART B ================= -->
+<section id="sec45">
+  <h2>B · 从 x86-64 到 Y86-64：absSum <span class="chip">4.1 节 · 练习题 4.5 / 4.6</span></h2>
+  <p class="hsub">先看懂图 4-6 的 sum，再补三块知识：怎么"造条件码"、条件传送指令 cmovXX 怎么用（B0 卡）、怎么"取绝对值"。</p>
+  <div class="card">
+    <h3 style="margin-top:0">图 4-6 · Sum 函数计算一个整数数组的和（相同的调用模式）</h3>
+    <p class="small muted">C 原型：<code class="mono">long sum(long *start, long count)</code>，start 在 %rdi，count 在 %rsi。</p>
+    <div class="grid2">
+      <div>
+        <pre>sum:
+    movl $0,%eax       <span class="c"># sum = 0</span>
+    jmp .L2            <span class="c"># Goto test</span>
+.L3:
+    addq (%rdi),%rax   <span class="c"># Add *start to sum</span>
+    addq $8,%rdi       <span class="c"># start++</span>
+    subq $1,%rsi       <span class="c"># count--</span>
+.L2:
+    testq %rsi,%rsi    <span class="c"># Test count</span>
+    jne .L3            <span class="c"># If != 0, goto loop</span>
+    rep; ret           <span class="c"># Return</span></pre>
+        <p class="small muted" style="margin-top:2px">x86-64 代码</p>
+      </div>
+      <div>
+        <pre>sum:
+    irmovq $8,%r8      <span class="c"># Constant 8</span>
+    irmovq $1,%r9      <span class="c"># Constant 1</span>
+    xorq %rax,%rax     <span class="c"># sum = 0</span>
+    andq %rsi,%rsi     <span class="c"># Set CC</span>
+    jmp test           <span class="c"># Goto test</span>
+loop:
+    mrmovq (%rdi),%r10 <span class="c"># Get *start</span>
+    addq %r10,%rax     <span class="c"># Add to sum</span>
+    addq %r8,%rdi      <span class="c"># start++</span>
+    subq %r9,%rsi      <span class="c"># count--</span>
+test:
+    jne loop           <span class="c"># Stop when 0</span>
+    ret                <span class="c"># Return</span></pre>
+        <p class="small muted" style="margin-top:2px">Y86-64 代码（图 4-6）</p>
+      </div>
+    </div>
+    <h3>对照着看，三处"翻译技巧"就是本题的全部钥匙</h3>
+    <table class="tbl">
+      <tr><th>x86-64 写法</th><th>Y86-64 只能这样写</th><th>原因</th></tr>
+      <tr><td class="mono">movl $0,%eax</td><td class="mono">xorq %rax,%rax</td><td>Y86-64 的立即数传送只有 irmovq（目标必须是寄存器），但异或自己 = 清零更省</td></tr>
+      <tr><td class="mono">testq %rsi,%rsi</td><td class="mono">andq %rsi,%rsi</td><td><b>Y86-64 没有 test/cmp，只有 OPq 会设置条件码</b>——andq x,x 与 testq x,x 一样能反映"是否为 0"</td></tr>
+      <tr><td class="mono">addq $8,%rdi / subq $1,%rsi</td><td class="mono">addq %r8,%rdi / subq %r9,%rsi</td><td>Y86-64 的运算指令没有立即数版本，先用 irmovq 把 8、1 放进寄存器</td></tr>
+      <tr><td class="mono">addq (%rdi),%rax</td><td class="mono">mrmovq (%rdi),%r10 ＋ addq %r10,%rax</td><td>内存操作数只能出现在 mrmovq / rmmovq 里，必须先取进寄存器</td></tr>
+    </table>
+    <div class="note">循环骨架是"<b>先跳 test 的卫语句</b>"：进循环前先判断 count=0，为 0 就直接 ret。这是 Y86-64 上写 while 循环的标准形状，4.5/4.6 保留它，只改 loop 体。</div>
+  </div>
+
+  <div class="card" id="cmovintro">
+    <h3 style="margin-top:0">B0 · 条件传送指令 cmovXX <span class="chip">4.1 节 · 练习题 4.6 的主角</span></h3>
+    <p><b>cmovXX rA, rB</b> 的语义只有一句话：<b>条件成立，才把 rA 的值复制进 rB；不成立则 rB 保持原值。</b>它是"带开关的 rrmovq"——rrmovq 就是 fn=0（条件恒成立）的特例。家族一览（与 jmp 家族共用同一张 fn 条件表）：</p>
+    <table class="tbl">
+      <tr><th>首字节</th><td class="mono">20</td><td class="mono">21</td><td class="mono">22</td><td class="mono">23</td><td class="mono">24</td><td class="mono">25</td><td class="mono">26</td></tr>
+      <tr><th>指令</th><td class="mono">rrmovq</td><td class="mono">cmovle</td><td class="mono">cmovl</td><td class="mono">cmove</td><td class="mono">cmovne</td><td class="mono">cmovge</td><td class="mono">cmovg</td></tr>
+      <tr><th>条件</th><td>恒成立</td><td class="mono">≤</td><td class="mono">&lt;</td><td class="mono">＝＝</td><td class="mono">≠</td><td class="mono">≥</td><td class="mono">＞</td></tr>
+    </table>
+    <ul>
+      <li><b>格式</b>：2 字节 = 首字节（icode 2 : fn）＋ 寄存器字节 rA:rB。rA 是<b>源</b>、rB 是<b>目的</b>；只能寄存器到寄存器，<b>不能碰内存</b>（碰内存的是 mrmovq / rmmovq）。</li>
+      <li><b>只读条件码，不写</b>（见附录 3.4）：条件看的是"最近一次 OPq"留下的 ZF / SF / OF。硬件判定fn 表那一列的组合，如 cmovg ⇔ ZF=0 且 SF=OF。同一个 fn，接在 icode 2 上是 cmovXX、接在 7 上是 jXX——<code class="mono">24</code> = cmovne，<code class="mono">74</code> = jne。</li>
+      <li><b>为什么存在</b>：分支（jXX）在流水线上可能因预测错误付出十几周期的代价（第 3 章 3.6.6 条件传送）；cmov 把"跳不跳"变成"写不写"——无论条件真假都固定 1 条指令，没有控制冒险。编译器处理三元表达式、abs、max 时常用。代价：<b>两个分支的值都得先算出来</b>（所以 4.6 里 −x 也要先算进 %r11）。</li>
+    </ul>
+    <p>小演算器：场景取自练习题 4.6——刚执行完 <code class="mono">xorq %r11,%r11</code> 和 <code class="mono">subq %r10,%r11</code>（r11 = 0−x，条件码来自这次减法），接着轮到 <b>cmovXX %r11, %r10</b>。改 x 和条件，看 %r10 会不会被替换：</p>
+    <div class="toolrow">
+      <label class="small">x = <input type="number" id="cmovX" value="-5" style="width:90px;background:var(--code-bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:4px 8px;font:inherit"></label>
+      <label class="small">条件 =
+        <select id="cmovFn" style="background:var(--code-bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:4px 8px;font:inherit">
+          <option value="g" selected>cmovg（＞）</option>
+          <option value="ge">cmovge（≥）</option>
+          <option value="l">cmovl（＜）</option>
+          <option value="le">cmovle（≤）</option>
+          <option value="e">cmove（＝＝）</option>
+          <option value="ne">cmovne（≠）</option>
+        </select>
+      </label>
+    </div>
+    <div id="cmovOut" aria-live="polite"></div>
+    <p class="note">硬件不看"−x &gt; 0"这种数学式，它看减法结果 (0−x) 的 ZF / SF / OF 组合（fn 表那一列）。与 4.5 对照记忆：跳转版 <code class="mono">jle</code> 判断的是"保持不变"的情况（x≥0 时跳过替换），传送版 <code class="mono">cmovg</code> 判断的是"需要替换"的情况（x＜0 才写）——同一事实，条件互补。</p>
+  </div>
+  <script>
+  (function(){
+    var xIn = document.getElementById('cmovX'), fnIn = document.getElementById('cmovFn'), out = document.getElementById('cmovOut');
+    function upd(){
+      var x = parseInt(xIn.value, 10); if(isNaN(x)) x = 0;
+      var r11 = -x, fn = fnIn.value, condText = '', cond = false;
+      switch(fn){
+        case 'g':  cond = r11 >  0; condText = '−x > 0';  break;
+        case 'ge': cond = r11 >= 0; condText = '−x ≥ 0';  break;
+        case 'l':  cond = r11 <  0; condText = '−x < 0';  break;
+        case 'le': cond = r11 <= 0; condText = '−x ≤ 0';  break;
+        case 'e':  cond = r11 === 0; condText = '−x = 0'; break;
+        case 'ne': cond = r11 !== 0; condText = '−x ≠ 0'; break;
+      }
+      var r10 = cond ? r11 : x;
+      var ok = (r10 === Math.abs(x)) ? ' ✓' : ' ✗';
+      out.innerHTML = '<table class="tbl"><tr><th>r11 = 0−x</th><th>cmov 条件 ' + condText +
+        '</th><th>动作</th><th>r10 最终（应为 |x|）</th></tr><tr><td class="mono">' + r11 + '</td><td>' +
+        (cond ? '<span class="badge ok">成立</span>' : '<span class="badge bad">不成立</span>') +
+        '</td><td>' + (cond ? '替换：r10 ← r11' : '保持：r10 不动') +
+        '</td><td class="mono">' + r10 + ok + '</td></tr></table>';
+    }
+    xIn.addEventListener('input', upd);
+    fnIn.addEventListener('change', upd);
+    upd();
+  })();
+  </script>
+
+  <div class="card" id="p45">
+    <h3 style="margin-top:0">练习题 4.5 <span class="chip">条件跳转版 absSum</span></h3>
+    <p>修改 sum 函数的 Y86-64 代码（图 4-6），实现函数 absSum，它计算一个数组的绝对值的和。<b>在内循环中使用条件跳转指令。</b></p>
+    <details class="sol"><summary>参考解答与讲解</summary><div class="body">
+      <p>补的知识点：|x| ＝ x≥0 取 x，x＜0 取 −x；而 Y86-64 没有 neg，<b>取负只能用 0−x</b>。条件码恰好由做减法的 subq 顺便设好：</p>
+      <pre>sum:
+    irmovq $8,%r8        <span class="c"># Constant 8</span>
+    irmovq $1,%r9        <span class="c"># Constant 1</span>
+    xorq %rax,%rax       <span class="c"># sum = 0</span>
+    andq %rsi,%rsi       <span class="c"># Set CC（count=0?）</span>
+    jmp test             <span class="c"># Goto test</span>
+loop:
+    mrmovq (%rdi),%r10   <span class="c"># r10 = *start</span>
+    xorq %r11,%r11       <span class="c"># r11 = 0</span>
+    subq %r10,%r11       <span class="c"># r11 = 0−x = −x，同时设置 CC（结果 = −x）</span>
+    jle keep             <span class="c"># −x ≤ 0 ⇔ x ≥ 0：r10 已经是 |x|，跳过</span>
+    rrmovq %r11,%r10     <span class="c"># x &lt; 0：r10 = −x = |x|</span>
+keep:
+    addq %r10,%rax       <span class="c"># sum += |x|</span>
+    addq %r8,%rdi        <span class="c"># start++</span>
+    subq %r9,%rsi        <span class="c"># count--</span>
+test:
+    jne loop             <span class="c"># Stop when 0</span>
+    ret                  <span class="c"># Return</span></pre>
+      <p>三种情况验证（条件 jle 作用在减法结果 −x 上）：</p>
+      <table class="tbl">
+        <tr><th>x</th><th>r11 = 0−x</th><th>jle（−x≤0）</th><th>r10 最终</th></tr>
+        <tr><td class="mono">5</td><td class="mono">−5</td><td>成立 → 跳过替换</td><td class="mono">5 ✓</td></tr>
+        <tr><td class="mono">−5</td><td class="mono">5</td><td>不成立 → 执行 rrmovq</td><td class="mono">5 ✓</td></tr>
+        <tr><td class="mono">0</td><td class="mono">0</td><td>成立 → 跳过替换</td><td class="mono">0 ✓</td></tr>
+      </table>
+      <div class="warnbox">易错：这里要用 <b>jle</b>（−x≤0 ⇔ x≥0 时跳过），不是 jge。写完务必把 正数 / 负数 / 0 三种情况各代一遍——考场口算两分钟，能稳拿这道题。</div>
+    </div></details>
+  </div>
+
+  <div class="card" id="p46">
+    <h3 style="margin-top:0">练习题 4.6 <span class="chip">条件传送版 absSum</span></h3>
+    <p>修改 sum 函数的 Y86-64 代码（图 4-6），实现函数 absSum，它计算一个数组的绝对值的和。<b>在内循环中使用条件传送指令。</b></p>
+    <details class="sol"><summary>参考解答与讲解</summary><div class="body">
+      <p>只改 loop 体的判断：把"条件跳转＋rrmovq"压成一条 <code class="mono">cmovg</code>（条件传送指令本身见上方 B0 卡）。注意条件<b>反过来了</b>——cmov 是"满足才替换"，所以要用"x＜0"即"−x＞0"的 <b>g</b>：</p>
+      <pre>loop:
+    mrmovq (%rdi),%r10   <span class="c"># r10 = *start</span>
+    xorq %r11,%r11       <span class="c"># r11 = 0</span>
+    subq %r10,%r11       <span class="c"># r11 = 0−x = −x，设置 CC</span>
+    cmovg %r11,%r10      <span class="c"># 仅当 −x &gt; 0（即 x &lt; 0）时 r10 = −x</span>
+    addq %r10,%rax       <span class="c"># sum += |x|</span>
+    addq %r8,%rdi        <span class="c"># start++</span>
+    subq %r9,%rsi        <span class="c"># count--</span></pre>
+      <table class="tbl">
+        <tr><th>x</th><th>cmovg 的条件（−x＞0）</th><th>r10 最终</th></tr>
+        <tr><td class="mono">5</td><td>−5＞0 假 → 不替换</td><td class="mono">5 ✓</td></tr>
+        <tr><td class="mono">−5</td><td>5＞0 真 → 替换</td><td class="mono">5 ✓</td></tr>
+        <tr><td class="mono">0</td><td>0＞0 假 → 不替换</td><td class="mono">0 ✓</td></tr>
+      </table>
+      <div class="note">为什么教材成对出这两题：cmov 无分支，<b>没有分支预测错误的惩罚</b>（呼应第 3 章"条件传送编译优化"）。跳转版多一条指令但路径直观；传送版恒定 4 条，流水线更友好。考试要点：条件跳转看"保持不变的情况"，条件传送看"需要替换的情况"——两者条件正好互补。</div>
+    </div></details>
+  </div>
+</section>
+
+<!-- ================= PART C ================= -->
+<section id="sec42">
+  <h2>C · HCL 与组合电路 <span class="chip">4.2 节 · 练习题 4.9 / 4.10 / 4.11</span></h2>
+  <p class="hsub">HCL（硬件控制语言）用类 C 的表达式描述组合电路的连线。先掌握三个位级积木，再上字级。</p>
+
+  <div class="card">
+    <h3 style="margin-top:0">C1 · 组合电路与 HCL 的基本约定</h3>
+    <ul>
+      <li><b>组合电路</b>：输出恒等于输入的某布尔函数——不存储任何状态、输出只随输入变、<b>不允许反馈环</b>。</li>
+      <li>HCL 使用与 C 相同的逻辑运算符 <code class="mono">&amp;&amp; || ! ==</code>，但含义是" wires 的连接"，没有短路求值、没有先后顺序。</li>
+      <li>字级信号用中等粗度线表示；位级布尔信号用细线/虚线（图 4-12 的画法约定）。</li>
+    </ul>
+  </div>
+
+  <div class="card" id="p49">
+    <h3 style="margin-top:0">背景与练习题 4.9 <span class="chip">位级：eq 与 xor</span></h3>
+    <p>正文中定义的位相等信号（图 4-10　检测位相等的组合电路：当输入都为 0 或都为 1 时，输出等于 1）：</p>
+    <pre>bool eq = (a &amp;&amp; b) || (!a &amp;&amp; !b);</pre>
+    <p><b>练习题 4.9</b>　写出信号 xor 的 HCL 表达式，xor 就是异或，输入为 a 和 b。信号 xor 和上面定义的 eq 有什么关系？</p>
+    <details class="sol"><summary>参考解答</summary><div class="body">
+      <pre>bool xor = (!a &amp;&amp; b) || (a &amp;&amp; !b);</pre>
+      <p>关系：<b>xor 是 eq 的补（相反）</b>——两位"不同"当且仅当"不相等"，所以 <code class="mono">xor = !eq</code>（或 eq = !xor）。这个结论正是 4.10 用异或搭相等电路的出发点。</p>
+    </div></details>
+  </div>
+
+  <div class="card" id="caseexpr">
+    <h3 style="margin-top:0">C3 · 多路复用器与 HCL case 表达式</h3>
+    <p>位级 MUX（图 4-11：s 为 1 输出 a，为 0 输出 b）：</p>
+    <pre>bool out = (s &amp;&amp; a) || (!s &amp;&amp; b);</pre>
+    <p>字级选择用 <b>case 表达式</b>：方括号包裹若干"<code class="mono">选择表达式 : 值;</code>"，<b>从上到下第一个成立者胜出</b>，最后的 <code class="mono">1 : …</code> 是默认分支。计算三个字 A、B、C 最小值的正文示例（练习题 4.11 所指代码，共 4 个 X&lt;=Y 比较）：</p>
+    <pre>word Min3 = [
+    A &lt;= B &amp;&amp; A &lt;= C : A;    <span class="c"># 2 个比较：A&lt;=B、A&lt;=C</span>
+    B &lt;= A &amp;&amp; B &lt;= C : B;    <span class="c"># 2 个比较：B&lt;=A、B&lt;=C</span>
+    1                : C;    <span class="c"># 否则选 C</span>
+];</pre>
+  </div>
+
+  <div class="card" id="p410">
+    <h3 style="margin-top:0">练习题 4.10 <span class="chip">64 位字级相等电路</span></h3>
+    <p>假设你用练习题 4.9 中的异或电路而不是位级的相等电路来实现一个字级的相等电路。设计一个 64 位字的相等电路需要 64 个位级的异或电路，另外还要两个逻辑门。</p>
+    <details class="sol"><summary>参考解答与讲解</summary><div class="body">
+      <p><b>推理链</b>：两位相等 ⇔ 异或结果为 0（4.9 的结论 xor = !eq）。于是 64 位相等 ⇔ <b>64 个异或结果全为 0</b> ⇔ 它们的或为 0：</p>
+      <ol>
+        <li>64 个位级异或电路：x<sub>i</sub> = A<sub>i</sub> ⊕ B<sub>i</sub>（i = 0…63）；</li>
+        <li><b>额外两个逻辑门</b> = 一个 <b>64 输入 OR</b>（any≠ ⇒ 输出 1）＋ 一个 <b>NOT</b>（取反得 eq）。</li>
+      </ol>
+      <pre class="mono">eq = !( x0 | x1 | x2 | … | x63 ),  其中 xi = Ai ^ Bi      <span class="c"># 等价于 HCL 的 A == B</span></pre>
+      <div class="note">对比原电路（图 4-12）：64 个"位相等 eq"＋ 1 个 AND 门。换成异或后，"求相等"变成"查有没有不同"——OR 到一起再取反。题目说的"另外还要两个逻辑门"就是 OR ＋ NOT。</div>
+      <p>下面是 8 位迷你版（原理同 64 位，点格子改变 A / B 的位）：</p>
+      <div id="demo410">
+        <div class="bitrow"><span class="lbl">A（高→低）</span><span id="bitsA" role="group" aria-label="A 的各位"></span></div>
+        <div class="bitrow"><span class="lbl">B（高→低）</span><span id="bitsB" role="group" aria-label="B 的各位"></span></div>
+        <div class="bitrow"><span class="lbl">Xi = Ai⊕Bi</span><span id="bitsX"></span></div>
+        <div class="bitrow" style="margin-top:14px">
+          <span class="lbl">OR 结果</span><span id="orLamp" class="lamp off"><i></i><span>or = 1（存在不同位）</span></span>
+          <span class="lbl">NOT → eq</span><span id="eqLamp" class="lamp off"><i></i><span>eq = 0　不相等</span></span>
+        </div>
+        <div class="toolrow">
+          <button class="btn ghost" id="eqSame" type="button">设 B = A（相等）</button>
+          <button class="btn ghost" id="eqFlip" type="button">翻转 B 全部位</button>
+          <button class="btn ghost" id="eqRand" type="button">随机 B</button>
+        </div>
+      </div>
+    </div></details>
+  </div>
+
+  <div class="card" id="p411">
+    <h3 style="margin-top:0">练习题 4.11 <span class="chip">Min3 只用三次比较</span></h3>
+    <p>计算三个字中最小值的 HCL 代码包含了 4 个形如 X&lt;=Y 的比较表达式。重写代码计算同样的结果，但只使用三个比较。</p>
+    <details class="sol"><summary>参考解答与讲解</summary><div class="body">
+      <p><b>观察</b>：原代码第二行 <code class="mono">B&lt;=A &amp;&amp; B&lt;=C</code> 的意思是"走到这里说明 A 不是最小，再确认 B 是不是最小"。但此时其实只需要比较 <b>B 和 C</b>——因为 A 已经出局，最小值只可能在 B、C 之中：</p>
+      <pre>word Min3 = [
+    A &lt;= B &amp;&amp; A &lt;= C : A;    <span class="c"># 2 个比较：A 是最小</span>
+    B &lt;= C           : B;    <span class="c"># 1 个比较：A 出局后，min 只能在 B、C 中</span>
+    1                : C;
+];</pre>
+      <p><b>为什么正确</b>：进入第二行时必有"A&gt;B 或 A&gt;C"。<br>· 若 A&gt;B：B＜A 且 B≤C → B 是最小，选 B ✓；<br>· 若 A≤B 且 A&gt;C：则 C＜A≤B → B≤C 不成立，落到默认分支选 C ✓。</p>
+      <div class="note">方法论：case 表达式<b>自上而下短路</b>，后面分支可以免费利用前面分支隐含的信息——这就是省掉一次比较的来源。同类题（如 4.12 求中间值）都适用。</div>
+    </div></details>
+  </div>
+</section>
+
+<footer>
+  来源：《深入理解计算机系统》（原书第 3 版）第 4 章 4.1 节、4.2 节；编码表核对自教材图 4.2 / 图 4.4，练习题答案与官方解答逐条核对。配套《练习题整理》PDF 在桌面。
+  本页为单文件离线页面，可直接转发他人，用 Edge 等现代浏览器打开即用。
+</footer>
+
+</div>
+
+<script>
+/* ===== Y86-64 核心逻辑（与 HTML 页面内嵌代码保持一致；Node 可直接 require 测试）===== */
+'use strict';
+
+const REGS = {rax:0,rcx:1,rdx:2,rbx:3,rsp:4,rbp:5,rsi:6,rdi:7,r8:8,r9:9,r10:10,r11:11,r12:12,r13:13,r14:14};
+const REG_NAMES = ['rax','rcx','rdx','rbx','rsp','rbp','rsi','rdi','r8','r9','r10','r11','r12','r13','r14'];
+
+/* 指令 -> [icode, ifun, 格式]；格式决定操作数与长度：none=1, rr=2, r=2, j=9, ri=rm=mr=10 */
+const INS = {
+  halt:[0,0,'none'], nop:[1,0,'none'],
+  rrmovq:[2,0,'rr'], cmovle:[2,1,'rr'], cmovl:[2,2,'rr'], cmove:[2,3,'rr'],
+  cmovne:[2,4,'rr'], cmovge:[2,5,'rr'], cmovg:[2,6,'rr'],
+  irmovq:[3,0,'ri'], rmmovq:[4,0,'rm'], mrmovq:[5,0,'mr'],
+  addq:[6,0,'rr'], subq:[6,1,'rr'], andq:[6,2,'rr'], xorq:[6,3,'rr'],
+  jmp:[7,0,'j'], jle:[7,1,'j'], jl:[7,2,'j'], je:[7,3,'j'],
+  jne:[7,4,'j'], jge:[7,5,'j'], jg:[7,6,'j'],
+  call:[8,0,'j'], ret:[9,0,'none'], pushq:[10,0,'r'], popq:[11,0,'r']
+};
+const SIZE = {none:1, rr:2, r:2, j:9, ri:10, rm:10, mr:10};
+
+function parseNum(s){
+  s = String(s).trim();
+  if(/^[-+]?0x[0-9a-fA-F]+$/.test(s)) return BigInt(s);
+  if(/^[-+]?\d+$/.test(s)) return BigInt(s);
+  return null;
+}
+function regId(tok){
+  const m = String(tok).trim().match(/^%(\w+)$/);
+  if(!m) throw new Error('“' + tok + '” 不是寄存器（应为 %rax 这种形式）');
+  const name = m[1].toLowerCase();
+  if(!(name in REGS)) throw new Error('未知寄存器 %' + name + '（Y86-64 只有 15 个寄存器，没有 %r15）');
+  return REGS[name];
+}
+function immVal(tok){
+  const m = String(tok).trim().match(/^\$(-?(?:0x[0-9a-fA-F]+|\d+))$/i);
+  if(!m) throw new Error('立即数应以 $ 开头，如 $15、$-4、$0x100');
+  const v = parseNum(m[1]);
+  if(v === null) throw new Error('无法解析立即数 ' + tok);
+  return v;
+}
+function pushC(b, v){ /* valC：8 字节、小端、64 位补码 */
+  const u = BigInt.asUintN(64, v);
+  for(let i = 0; i < 8; i++) b.push(Number((u >> BigInt(8 * i)) & 0xFFn));
+}
+function hexByte(x){ return Number(x).toString(16).padStart(2, '0'); }
+
+/* ---------- 汇编器（两遍：先记地址与标号，再生成字节）---------- */
+function assemble(src){
+  const lines = String(src).split(/\r?\n/);
+  const labels = {};
+  const parsed = [];
+  const errors = [];
+  let addr = 0n;
+  for(let i = 0; i < lines.length; i++){
+    let line = lines[i].split('#')[0].trim();
+    if(!line) continue;
+    let m;
+    while((m = line.match(/^([A-Za-z_.][A-Za-z0-9_.]*)\s*:\s*(.*)$/))){
+      labels[m[1]] = addr;
+      line = m[2].trim();
+    }
+    if(!line) continue;
+    if(/^\.pos\b/i.test(line)){
+      const v = parseNum(line.replace(/^\.pos\s*/i, ''));
+      if(v === null){ errors.push({line: i + 1, msg: '.pos 后需要一个数字地址，如 .pos 0x100'}); continue; }
+      addr = v;
+      parsed.push({kind: 'pos', lineNo: i + 1, addr: v});
+      continue;
+    }
+    const im = line.match(/^([A-Za-z]+)\s*(.*)$/);
+    if(!im){ errors.push({line: i + 1, msg: '无法识别的行：' + line}); continue; }
+    const mnem = im[1].toLowerCase();
+    if(!(mnem in INS)){ errors.push({line: i + 1, msg: '未知指令 “' + im[1] + '”（注意 Y86-64 没有 iaddq 等扩展指令）'}); continue; }
+    parsed.push({kind: 'ins', lineNo: i + 1, mnem, spec: INS[mnem], rest: im[2].trim(), addr, text: line});
+    addr += BigInt(SIZE[INS[mnem][2]]);
+  }
+  const out = [];
+  for(const p of parsed){
+    if(p.kind === 'pos'){ out.push({type: 'pos', addr: p.addr, line: p.lineNo}); continue; }
+    try{
+      const bytes = emitIns(p, labels);
+      out.push({type: 'ins', addr: p.addr, bytes, text: p.text, line: p.lineNo});
+    }catch(e){
+      out.push({type: 'err', addr: p.addr, text: p.text, line: p.lineNo, msg: e.message});
+    }
+  }
+  return {out, errors};
+}
+
+function emitIns(p, labels){
+  const [icode, ifun, fmt] = p.spec;
+  const b = [(icode << 4) | ifun];
+  const ops = p.rest;
+  const args = () => ops.split(',').map(x => x.trim()).filter(x => x.length);
+  if(fmt === 'none'){
+    if(ops) throw new Error(p.mnem + ' 不带操作数');
+  } else if(fmt === 'rr'){
+    const a = args();
+    if(a.length !== 2) throw new Error('需要两个寄存器操作数：%rA, %rB');
+    b.push((regId(a[0]) << 4) | regId(a[1]));
+  } else if(fmt === 'r'){
+    const a = args();
+    if(a.length !== 1) throw new Error('需要一个寄存器操作数');
+    b.push((regId(a[0]) << 4) | 0xF);
+  } else if(fmt === 'ri'){
+    const a = args();
+    if(a.length !== 2) throw new Error('需要 $V, %rB 两个操作数');
+    const v = immVal(a[0]);
+    b.push((0xF << 4) | regId(a[1]));
+    pushC(b, v);
+  } else if(fmt === 'rm'){
+    const a = args();
+    if(a.length !== 2) throw new Error('需要 %rA, D(%rB) 两个操作数');
+    const ra = regId(a[0]);
+    const mm = a[1].match(/^(-?(?:0x[0-9a-fA-F]+|\d+))?\s*\(\s*%(\w+)\s*\)$/i);
+    if(!mm) throw new Error('第二个操作数应为 D(%rB) 形式，如 -3(%rbx)');
+    const d = (mm[1] !== undefined && parseNum(mm[1]) !== null) ? parseNum(mm[1]) : 0n;
+    b.push((ra << 4) | regId('%' + mm[2]));
+    pushC(b, d);
+  } else if(fmt === 'mr'){
+    const a = args();
+    if(a.length !== 2) throw new Error('需要 D(%rB), %rA 两个操作数');
+    const mm = a[0].match(/^(-?(?:0x[0-9a-fA-F]+|\d+))?\s*\(\s*%(\w+)\s*\)$/i);
+    if(!mm) throw new Error('第一个操作数应为 D(%rB) 形式，如 (%rdi)');
+    const d = (mm[1] !== undefined && parseNum(mm[1]) !== null) ? parseNum(mm[1]) : 0n;
+    b.push((regId(a[1]) << 4) | regId('%' + mm[2]));
+    pushC(b, d);
+  } else if(fmt === 'j'){
+    let dest;
+    if(ops in labels) dest = labels[ops];
+    else {
+      dest = parseNum(ops);
+      if(dest === null) throw new Error('跳转目标应为标号或数字地址');
+    }
+    pushC(b, dest);
+  }
+  return b;
+}
+
+/* ---------- 反汇编器 ---------- */
+function bytesFromHex(h){
+  const clean = String(h).replace(/[^0-9a-fA-F]/g, '');
+  const out = [];
+  for(let i = 0; i + 1 < clean.length; i += 2) out.push(parseInt(clean.substr(i, 2), 16));
+  return {bytes: out, odd: (clean.length % 2) === 1};
+}
+function valAt(bytes, off){
+  let v = 0n;
+  for(let k = 7; k >= 0; k--) v = (v << 8n) | BigInt(bytes[off + k]);
+  return v;
+}
+function fmtD(v){ return (v >= -15n && v <= 15n) ? v.toString() : '0x' + BigInt.asUintN(64, v).toString(16); }
+
+function decodeSeq(startAddr, hexStr){
+  const {bytes, odd} = bytesFromHex(hexStr);
+  const rows = [];
+  if(bytes.length === 0){ rows.push({addr: startAddr, bytes: [], ok: false, msg: '没有可解码的字节'}); return rows; }
+  let i = 0, pc = startAddr;
+  while(i < bytes.length){
+    const first = bytes[i];
+    const icode = first >> 4, ifun = first & 0xF;
+    if(icode > 0xB){
+      rows.push({addr: pc, bytes: bytes.slice(i), ok: false,
+        msg: '非法指令：首字节 ' + hexByte(first).toUpperCase() + ' 的 icode=' + icode.toString(16).toUpperCase() + '（合法范围 0~B），无法确定长度，解码终止'});
+      break;
+    }
+    let len = 0, desc = '', err = null, regOff = -1, cOff = -1;
+    switch(icode){
+      case 0: case 1: case 9:
+        if(ifun !== 0){ err = '非法 ifun（' + ['halt','nop','ret'][[0,1,9].indexOf(icode)] + ' 的 ifun 必须为 0）'; len = 1; break; }
+        len = 1; desc = ['halt','nop','ret'][[0,1,9].indexOf(icode)]; break;
+      case 2:
+        if(ifun > 6){ err = '非法 ifun：fn=' + ifun + '（cmov 家族 fn 为 0~6）'; len = 2; regOff = i + 1; break; }
+        len = 2; regOff = i + 1;
+        desc = ifun === 0 ? 'rrmovq' : 'cmov' + ['','le','l','e','ne','ge','g'][ifun]; break;
+      case 3: len = 10; regOff = i + 1; cOff = i + 2; desc = 'irmovq'; break;
+      case 4: len = 10; regOff = i + 1; cOff = i + 2; desc = 'rmmovq'; break;
+      case 5: len = 10; regOff = i + 1; cOff = i + 2; desc = 'mrmovq'; break;
+      case 6:
+        if(ifun > 3){ err = '非法 ifun：fn=' + ifun + '（OPq 运算 fn 为 0~3）'; len = 2; regOff = i + 1; break; }
+        len = 2; regOff = i + 1; desc = ['addq','subq','andq','xorq'][ifun]; break;
+      case 7:
+        if(ifun > 6){ err = '非法 ifun：fn=' + ifun + '（jXX 条件 fn 为 0~6）'; len = 9; cOff = i + 1; break; }
+        len = 9; cOff = i + 1; desc = 'j' + ['mp','le','l','e','ne','ge','g'][ifun]; break;
+      case 8:
+        if(ifun !== 0){ err = '非法 ifun（call 的 ifun 必须为 0）'; len = 9; cOff = i + 1; break; }
+        len = 9; cOff = i + 1; desc = 'call'; break;
+      case 10: case 11:
+        if(ifun !== 0){ err = '非法 ifun'; len = 2; regOff = i + 1; break; }
+        len = 2; regOff = i + 1; desc = icode === 10 ? 'pushq' : 'popq'; break;
+    }
+    if(i + len > bytes.length){
+      rows.push({addr: pc, bytes: bytes.slice(i), ok: false,
+        msg: '不完整：' + (desc || '该指令') + ' 需要 ' + len + ' 字节，但只剩 ' + (bytes.length - i) + ' 字节'});
+      break;
+    }
+    const seq = bytes.slice(i, i + len);
+    if(err){
+      rows.push({addr: pc, bytes: seq, ok: false, msg: err});
+      i += len; pc += BigInt(len); continue;
+    }
+    let text = desc;
+    if(regOff >= 0){
+      const rb = bytes[regOff], ra = rb >> 4, rbb = rb & 0xF;
+      let bad = null;
+      if(icode === 3){
+        if(ra !== 15) bad = 'irmovq 的 rA 槽必须填 F（无寄存器），实际为 ' + (ra > 14 ? 'F' : REG_NAMES[ra]);
+        else if(rbb > 14) bad = 'irmovq 的 rB 为 F（无寄存器），非法';
+      } else if(icode === 10 || icode === 11){
+        if(ra > 14) bad = desc + ' 的 rA 不能是 F（无寄存器）';
+        else if(rbb !== 15) bad = desc + ' 的 rB 槽必须填 F，实际为 ' + (rbb > 14 ? 'F' : REG_NAMES[rbb]);
+      } else {
+        if(ra > 14 || rbb > 14) bad = '寄存器字节 ' + hexByte(rb).toUpperCase() + ' 含非法编号 F（rA 与 rB 都必须是 0~E 的真实寄存器）';
+      }
+      if(bad){
+        rows.push({addr: pc, bytes: seq, ok: false, msg: bad + '（按 ' + len + ' 字节跳过，继续解码）'});
+        i += len; pc += BigInt(len); continue;
+      }
+      if(icode === 2 || icode === 6) text += ' %' + REG_NAMES[ra] + ',%' + REG_NAMES[rbb];
+      else if(icode === 10 || icode === 11) text += ' %' + REG_NAMES[ra];
+      else if(icode === 3){ text += ' $' + BigInt.asIntN(64, valAt(bytes, regOff + 1)).toString() + ',%' + REG_NAMES[rbb]; }
+      else if(icode === 4){ text += ' %' + REG_NAMES[ra] + ',' + fmtD(valAt(bytes, regOff + 1)) + '(%' + REG_NAMES[rbb] + ')'; }
+      else if(icode === 5){ text += ' ' + fmtD(valAt(bytes, regOff + 1)) + '(%' + REG_NAMES[rbb] + '),%' + REG_NAMES[ra]; }
+    }
+    if(cOff >= 0 && regOff < 0) text += ' 0x' + valAt(bytes, cOff).toString(16);
+    rows.push({addr: pc, bytes: seq, ok: true, msg: text});
+    i += len; pc += BigInt(len);
+  }
+  if(odd) rows.push({addr: pc, bytes: [], ok: false, msg: '输入的十六进制字符数为奇数，最后半个字节被忽略'});
+  return rows;
+}
+
+/* 解析多行“序列”输入：每行形如 “A. 0x100: 30f3…”，或纯十六进制串 */
+function parseSeqInput(text){
+  const seqs = [];
+  const lines = String(text).split(/\r?\n/);
+  let autoAddr = 0n;
+  for(const raw of lines){
+    const line = raw.trim();
+    if(!line) continue;
+    const m = line.match(/0x([0-9a-fA-F]+)\s*:\s*(.+)$/) || line.match(/^([0-9a-fA-F]+)\s*:\s*(.+)$/);
+    if(m){
+      const tagM = line.match(/^([A-Za-z])[.\s]/);
+      seqs.push({tag: tagM ? tagM[1] : '', addr: BigInt('0x' + m[1]), hex: m[2], head: line.replace(/:.*/, '') });
+    } else if(/^[0-9a-fA-F]{2,}$/.test(line.replace(/\s+/g, ''))){
+      const hex = line.replace(/\s+/g, '');
+      seqs.push({tag: '', addr: autoAddr, hex, head: '0x' + autoAddr.toString(16)});
+      autoAddr += BigInt(hex.length / 2);
+    }
+  }
+  return seqs;
+}
+
+if(typeof module !== 'undefined' && module.exports){
+  module.exports = {REGS, REG_NAMES, INS, SIZE, parseNum, assemble, decodeSeq, parseSeqInput, hexByte};
+}
+
+
+/* ================= 页面交互 ================= */
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function hex2(x){return x.toString(16).padStart(2,'0');}
+
+/* ---- 汇编器 ---- */
+var ASM_DEFAULT = null;
+function runAsm(){
+  var src = document.getElementById('asmIn').value;
+  var res = assemble(src);
+  var html = '';
+  res.errors.forEach(function(e){
+    html += '<div class="errline">第 ' + e.line + ' 行：' + esc(e.msg) + '</div>';
+  });
+  html += '<table class="tbl"><tr><th style="width:90px">地址</th><th style="width:290px">字节（小端）</th><th>汇编</th></tr>';
+  res.out.forEach(function(r){
+    if(r.type === 'pos'){
+      html += '<tr class="posrow"><td class="mono">0x' + r.addr.toString(16) + '</td><td colspan="2">.pos —— 后续代码从这里开始</td></tr>';
+    } else if(r.type === 'err'){
+      html += '<tr class="badrow"><td class="mono">0x' + r.addr.toString(16) + '</td><td>—</td><td class="mono">' + esc(r.text) + '<div class="errmsg">' + esc(r.msg) + '</div></td></tr>';
+    } else {
+      html += '<tr><td class="mono">0x' + r.addr.toString(16) + '</td><td class="mono bytes">' +
+        r.bytes.map(hex2).join(' ') + '</td><td class="mono">' + esc(r.text) + '</td></tr>';
+    }
+  });
+  html += '</table>';
+  document.getElementById('asmOut').innerHTML = html;
+}
+
+/* ---- 反汇编器 ---- */
+function runDec(){
+  var seqs = parseSeqInput(document.getElementById('decIn').value);
+  var el = document.getElementById('decOut');
+  if(!seqs.length){ el.innerHTML = '<div class="errline">没有识别到序列。每行写成“A. 0x100: 30f3…”的形式，冒号前是起始地址。</div>'; return; }
+  el.innerHTML = seqs.map(function(s){
+    var rows = decodeSeq(s.addr, s.hex);
+    var trs = rows.map(function(r){
+      var by = r.bytes.map(hex2).join(' ');
+      var badge = r.ok ? '<span class="badge ok">合法</span>' : '<span class="badge bad">非法</span>';
+      return '<tr' + (r.ok ? '' : ' class="badrow"') + '><td class="mono">0x' + r.addr.toString(16) +
+        '</td><td class="mono bytes">' + esc(by) + '</td><td>' + badge + '<span class="mono">' + esc(r.msg) +
+        '</span></td></tr>';
+    }).join('');
+    return '<div class="seqcard"><div class="seqhead">' + esc(s.tag ? s.tag + ' · ' : '') +
+      '起始地址 0x' + s.addr.toString(16) + '</div><table class="tbl"><tr><th style="width:90px">地址</th>' +
+      '<th style="width:290px">字节</th><th>汇编 / 错误报告</th></tr>' + trs + '</table></div>';
+  }).join('');
+}
+
+/* ---- 知识点清单（localStorage 持久化）---- */
+var KP_KEY = 'csapp_ch41_kp';
+function kpLoad(){ try{ return JSON.parse(localStorage.getItem(KP_KEY)) || {}; }catch(e){ return {}; } }
+function kpSave(o){ try{ localStorage.setItem(KP_KEY, JSON.stringify(o)); }catch(e){} }
+function kpUpdate(){
+  var boxes = document.querySelectorAll('.kp input[type=checkbox]');
+  var state = kpLoad(), done = 0;
+  boxes.forEach(function(b){ if(b.checked) done++; });
+  document.getElementById('progText').textContent = '已掌握 ' + done + '/' + boxes.length;
+  document.getElementById('progBar').style.width = (done * 100 / boxes.length) + '%';
+}
+function kpInit(){
+  var state = kpLoad();
+  document.querySelectorAll('.kp input[type=checkbox]').forEach(function(b){
+    if(state[b.id]) b.checked = true;
+    b.addEventListener('change', function(){
+      var s = kpLoad(); s[b.id] = b.checked; kpSave(s); kpUpdate();
+    });
+  });
+  kpUpdate();
+}
+
+/* ---- 8 位字级相等演示 ---- */
+var bitA = [1,0,1,1,0,0,1,0], bitB = [1,0,1,1,0,0,1,0];
+function bitChips(arr, which){
+  return arr.map(function(v, i){
+    return '<button type="button" class="bit" data-w="' + which + '" data-i="' + i +
+      '" aria-pressed="' + (v ? 'true' : 'false') + '" aria-label="第' + (7 - i) + '位">' + v + '</button>';
+  }).join('');
+}
+function renderEq(){
+  var xs = [], orVal = 0;
+  for(var i = 0; i < 8; i++){ xs.push(bitA[i] ^ bitB[i]); orVal = orVal || (bitA[i] ^ bitB[i]); }
+  var eq = 1 - orVal;
+  document.getElementById('bitsA').innerHTML = bitChips(bitA, 'A');
+  document.getElementById('bitsB').innerHTML = bitChips(bitB, 'B');
+  document.getElementById('bitsX').innerHTML = xs.map(function(v){
+    return '<span class="xorcell' + (v ? ' hot' : '') + '">' + v + '</span>';
+  }).join('');
+  var orL = document.getElementById('orLamp'), eqL = document.getElementById('eqLamp');
+  orL.className = 'lamp ' + (orVal ? 'off' : 'on');
+  orL.innerHTML = '<i></i><span>or = ' + orVal + (orVal ? '（存在不同位）' : '（64 位全同则 or=0）') + '</span>';
+  eqL.className = 'lamp ' + (eq ? 'on' : 'off');
+  eqL.innerHTML = '<i></i><span>eq = ' + eq + (eq ? '　相等' : '　不相等') + '</span>';
+}
+function initEq(){
+  document.getElementById('demo410').addEventListener('click', function(ev){
+    var t = ev.target.closest('button.bit');
+    if(!t) return;
+    var arr = t.dataset.w === 'A' ? bitA : bitB;
+    arr[+t.dataset.i] = 1 - arr[+t.dataset.i];
+    renderEq();
+  });
+  document.getElementById('eqSame').addEventListener('click', function(){ bitB = bitA.slice(); renderEq(); });
+  document.getElementById('eqFlip').addEventListener('click', function(){ bitB = bitB.map(function(v){ return 1 - v; }); renderEq(); });
+  document.getElementById('eqRand').addEventListener('click', function(){
+    bitB = bitB.map(function(){ return Math.random() < 0.5 ? 0 : 1; }); renderEq();
+  });
+}
+
+/* ---- 启动 ---- */
+document.getElementById('asmRun').addEventListener('click', runAsm);
+document.getElementById('decRun').addEventListener('click', runDec);
+document.getElementById('asmReset').addEventListener('click', function(){
+  document.getElementById('asmIn').value =
+'.pos 0x100    # Start code at address 0x100\n' +
+'    irmovq $15,%rbx\n' +
+'    rrmovq %rbx,%rcx\n' +
+'loop:\n' +
+'    rmmovq %rcx,-3(%rbx)\n' +
+'    addq %rbx,%rcx\n' +
+'    jmp loop';
+  runAsm();
+});
+document.getElementById('decReset').addEventListener('click', function(){
+  document.getElementById('decIn').value =
+'A. 0x100: 30f3fcffffffffffffff40630008000000000000\n' +
+'B. 0x200: a06f800c0200000000000030f30a0000000000000090\n' +
+'C. 0x300: 5054070000000000000010f0b01f\n' +
+'D. 0x400: 6113730004000000000000\n' +
+'E. 0x500: 6362a0f0';
+  runDec();
+});
+kpInit();
+initEq();
+runAsm();
+runDec();
+renderEq();
+</script>
+</body>
+</html>
