@@ -1,0 +1,2053 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CSAPP 第4章互动学习（4.3–4.4 · SEQ 六阶段 → PIPE 流水线）</title>
+<style>
+  :root{
+    --bg:#f4f6fb; --card:#ffffff; --ink:#182034; --muted:#5b6474;
+    --line:#e3e8f2; --brand:#1d4ed8; --brand-weak:#eff4ff; --brand-line:#c9d8ff;
+    --ok:#15803d; --ok-bg:#ecfdf5; --bad:#b91c1c; --bad-bg:#fef2f2;
+    --warn:#92400e; --warn-bg:#fffbeb;
+    --code-bg:#f8faff; --code-ink:#1f2937; --shadow:0 1px 3px rgba(16,24,40,.06),0 8px 24px rgba(16,24,40,.05);
+    --cF:#2563eb; --cD:#7c3aed; --cE:#ea580c; --cM:#0891b2; --cW:#15803d; --cP:#be185d;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0f1420; --card:#171e2e; --ink:#e6eaf3; --muted:#9aa4ba;
+      --line:#2a3247; --brand:#7ea2ff; --brand-weak:#1c2740; --brand-line:#31406b;
+      --ok:#4ade80; --ok-bg:#12291e; --bad:#f87171; --bad-bg:#331717;
+      --warn:#fbbf24; --warn-bg:#2e2410;
+      --code-bg:#101828; --code-ink:#dbe4f5; --shadow:0 1px 3px rgba(0,0,0,.4);
+      --cF:#60a5fa; --cD:#a78bfa; --cE:#fb923c; --cM:#22d3ee; --cW:#4ade80; --cP:#f472b6;
+    }
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;
+    font-size:15px;line-height:1.8;}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 20px 80px}
+  a{color:var(--brand)}
+  code,.mono{font-family:"Cascadia Code",Consolas,"JetBrains Mono",monospace}
+
+  /* ---- 顶部导航 ---- */
+  nav{position:sticky;top:0;z-index:50;background:color-mix(in srgb, var(--card) 88%, transparent);
+    backdrop-filter:blur(10px);border-bottom:1px solid var(--line);}
+  .navin{max-width:1120px;margin:0 auto;padding:8px 20px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .navin .ttl{font-weight:600;margin-right:8px;font-size:14px}
+  .navin a{font-size:13px;color:var(--muted);text-decoration:none;padding:3px 10px;border-radius:999px}
+  .navin a:hover{background:var(--brand-weak);color:var(--brand)}
+  .navin .qchip{margin-left:auto;font-size:12px;color:var(--muted);background:var(--brand-weak);
+    border:1px solid var(--brand-line);border-radius:999px;padding:2px 12px}
+
+  /* ---- 英雄区 ---- */
+  header.hero{background:linear-gradient(135deg,var(--brand-weak),var(--card) 65%);
+    border-bottom:1px solid var(--line);padding:40px 0 30px;margin-bottom:26px}
+  .hero .kick{font-size:12px;letter-spacing:3px;color:var(--brand);font-weight:600;margin-bottom:8px}
+  .hero h1{margin:0 0 10px;font-size:27px;line-height:1.4}
+  .hero p.sub{margin:0;color:var(--muted);max-width:820px}
+
+  /* ---- 通用块 ---- */
+  section{margin-top:38px}
+  h2{font-size:21px;margin:0 0 4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  h2 .chip{font-size:12px;font-weight:600;color:var(--brand);background:var(--brand-weak);
+    border:1px solid var(--brand-line);border-radius:999px;padding:1px 10px;letter-spacing:1px}
+  .hsub{color:var(--muted);font-size:13.5px;margin:0 0 14px}
+  h3{font-size:16px;margin:18px 0 8px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:16px 18px}
+  .tipbox{background:var(--warn-bg);border:1px solid color-mix(in srgb, var(--warn) 35%, transparent);
+    border-radius:10px;padding:8px 14px;font-size:13.5px;color:var(--warn);margin:10px 0}
+  .okbox{background:var(--ok-bg);border:1px solid color-mix(in srgb, var(--ok) 35%, transparent);
+    border-radius:10px;padding:8px 14px;font-size:13.5px;color:var(--ok);margin:10px 0}
+
+  /* ---- 信号 chip ---- */
+  .schip{display:inline-flex;align-items:center;gap:4px;font-family:Consolas,monospace;font-size:13px;
+    border-radius:999px;padding:1px 10px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+  .schip.fill{background:var(--brand-weak);border-color:var(--brand-line);color:var(--brand);font-weight:600}
+  .chiprow{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+
+  /* ---- §1 六阶段卡 ---- */
+  .flowstrip{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+  @media(max-width:860px){.flowstrip{grid-template-columns:repeat(3,1fr)}}
+  @media(max-width:560px){.flowstrip{grid-template-columns:repeat(2,1fr)}}
+  .stg{position:relative;background:var(--card);border:1px solid var(--line);border-top:4px solid var(--sc);
+    border-radius:12px;padding:10px 8px 8px;text-align:center;cursor:pointer;transition:transform .15s, box-shadow .15s}
+  .stg:hover{transform:translateY(-3px);box-shadow:var(--shadow)}
+  .stg.act{box-shadow:0 0 0 2px var(--sc), var(--shadow)}
+  .stg .lt{font-weight:700;font-size:22px;color:var(--sc);line-height:1.2}
+  .stg .nm{font-weight:600;font-size:14px}
+  .stg .en{font-size:11px;color:var(--muted)}
+  .stg .hw{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.4}
+  .flowarrow{text-align:center;color:var(--muted);font-size:18px;align-self:center}
+  .stg-detail{margin-top:12px}
+  .kv{display:grid;grid-template-columns:88px 1fr;gap:4px 10px;font-size:13.5px}
+  .kv dt{color:var(--muted);margin:0}
+  .kv dd{margin:0}
+
+  /* ---- §2 信号字典 ---- */
+  .siggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+  .sigbtn{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px;
+    text-align:left;cursor:pointer;transition:transform .12s, box-shadow .12s;font-family:inherit}
+  .sigbtn:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+  .sigbtn.act{border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-weak)}
+  .sigbtn .sn{font-family:Consolas,monospace;font-weight:700;font-size:15px;color:var(--brand)}
+  .sigbtn .sc2{font-size:12px;color:var(--muted)}
+  .sigbtn .from{font-size:11px;margin-top:2px}
+  table.mx{border-collapse:collapse;width:100%;font-size:13px}
+  table.mx th,table.mx td{border:1px solid var(--line);padding:4px 8px;text-align:center}
+  table.mx th{background:var(--brand-weak);font-weight:600}
+  table.mx td.sn,table.mx th.sn{text-align:left;font-family:Consolas,monospace}
+  .dp{color:var(--brand);font-weight:700}
+  .du{color:var(--cM);font-weight:700}
+  .dc{color:var(--muted)}
+  .db{color:var(--cE);font-weight:700}
+  .lg{font-size:12.5px;color:var(--muted);margin-top:6px}
+
+  /* ---- §3 模拟器 ---- */
+  .simcard{padding:14px 16px}
+  .ctlrow{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+  .ctl label{display:block;font-size:12px;color:var(--muted);margin-bottom:2px}
+  .ctl select,.ctl input[type=text]{background:var(--card);color:var(--ink);border:1px solid var(--line);
+    border-radius:8px;padding:5px 8px;font-size:14px;font-family:inherit;min-width:90px}
+  .ctl input[type=text]{font-family:Consolas,monospace;width:110px}
+  .btn{background:var(--brand-weak);color:var(--brand);border:1px solid var(--brand-line);border-radius:9px;
+    padding:6px 16px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
+  .btn:hover{filter:brightness(1.05)}
+  .btn.main{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .btn.ghost{background:var(--card);color:var(--muted);border-color:var(--line)}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .quick{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .quick button{font-size:12.5px;border-radius:999px;padding:2px 12px;background:var(--card);
+    border:1px solid var(--line);color:var(--muted);cursor:pointer;font-family:inherit}
+  .quick button:hover{border-color:var(--brand);color:var(--brand)}
+
+  svg.dp{width:100%;height:auto;display:block;margin:6px 0 2px}
+  .dpbox rect{fill:var(--card);stroke:var(--line);stroke-width:1.4;rx:10}
+  .dpbox text{fill:var(--ink);font-size:15px;font-weight:600;text-anchor:middle}
+  .dpbox text.t2{fill:var(--muted);font-size:10.5px;font-weight:400}
+  .dpbox text.t3{fill:var(--muted);font-size:10px;font-weight:400;font-family:Consolas,monospace}
+  .dpbox.on rect{stroke:var(--sc);stroke-width:2.6;filter:drop-shadow(0 0 7px var(--sc))}
+  .dpbox.on text.t1{fill:var(--sc)}
+  .dpbox.warm rect{stroke:var(--warn)}
+  .dparrow{stroke:var(--muted);stroke-width:1.6;fill:none;opacity:.55}
+  .dparrow.on{stroke:var(--sc);stroke-width:2.6;opacity:1;
+    stroke-dasharray:7 5;animation:flow .7s linear infinite}
+  @keyframes flow{to{stroke-dashoffset:-12}}
+  .lbl{fill:var(--muted);font-size:10.5px;font-family:Consolas,monospace;text-anchor:middle;opacity:0;transition:opacity .3s}
+  .lbl.on{opacity:1;fill:var(--sc)}
+  #pulse{fill:var(--brand);stroke:var(--card);stroke-width:2;transition:fill .3s}
+
+  .simgrid{display:grid;grid-template-columns:300px 1fr 1.35fr;gap:12px;margin-top:12px;align-items:start}
+  @media(max-width:980px){.simgrid{grid-template-columns:1fr 1fr}}
+  @media(max-width:700px){.simgrid{grid-template-columns:1fr}}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+  .panel h4{margin:0 0 6px;font-size:13px;color:var(--muted);font-weight:600;letter-spacing:1px}
+  .pcbig{font-family:Consolas,monospace;font-size:22px;font-weight:700;color:var(--brand)}
+  .statchip{font-size:12px;border-radius:999px;padding:1px 10px;border:1px solid var(--line);margin-left:8px;vertical-align:middle}
+  .statchip.hlt{color:var(--bad);border-color:var(--bad);background:var(--bad-bg)}
+  .statchip.aok{color:var(--ok);border-color:var(--ok);background:var(--ok-bg)}
+  .regrow{display:grid;grid-template-columns:52px 1fr;gap:6px;align-items:center;font-size:13px}
+  .regrow .rn{font-family:Consolas,monospace;color:var(--muted)}
+  .regrow input{width:100%;background:var(--code-bg);color:var(--code-ink);border:1px solid var(--line);
+    border-radius:6px;padding:2px 6px;font-family:Consolas,monospace;font-size:13px}
+  .ccrow{display:flex;gap:6px;margin-top:4px}
+  .ccbtn{flex:1;font-family:Consolas,monospace;font-size:13px;border-radius:8px;padding:3px 0;cursor:pointer;
+    border:1px solid var(--line);background:var(--card);color:var(--muted);font-weight:700}
+  .ccbtn.on1{background:var(--brand-weak);border-color:var(--brand);color:var(--brand)}
+  .memrow{display:grid;grid-template-columns:76px 1fr;gap:8px;font-family:Consolas,monospace;font-size:12.5px;
+    padding:1px 4px;border-radius:6px;align-items:center}
+  .memrow .ma{color:var(--muted)}
+  .memrow.stack{background:color-mix(in srgb, var(--cP) 8%, transparent)}
+  .bytes{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0}
+  .btag{font-family:Consolas,monospace;font-size:13px;border-radius:6px;padding:2px 8px;border:1px solid var(--line)}
+  .btag.op{background:var(--brand-weak);border-color:var(--brand-line);color:var(--brand);font-weight:700}
+  .btag.rg{background:color-mix(in srgb, var(--cD) 12%, transparent);border-color:color-mix(in srgb, var(--cD) 40%, transparent);color:var(--cD)}
+  .btag.vc{background:color-mix(in srgb, var(--cE) 12%, transparent);border-color:color-mix(in srgb, var(--cE) 40%, transparent);color:var(--cE)}
+  .legend{font-size:11.5px;color:var(--muted)}
+
+  .stepper{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:8px}
+  .stepdot{border:1px solid var(--line);border-radius:9px;background:var(--card);cursor:pointer;
+    padding:4px 2px;text-align:center;font-family:inherit;transition:all .2s}
+  .stepdot .sl{font-family:Consolas,monospace;font-weight:700;font-size:14px;color:var(--muted)}
+  .stepdot .szh{font-size:11px;color:var(--muted);display:block;line-height:1.3}
+  .stepdot.done{background:color-mix(in srgb, var(--sc) 14%, var(--card));border-color:var(--sc)}
+  .stepdot.done .sl{color:var(--sc)}
+  .stepdot.cur{box-shadow:0 0 0 2px var(--sc);transform:translateY(-2px)}
+  .stepdot.cur .sl{color:var(--sc)}
+  .btnrow{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+  .stagepanel{min-height:230px}
+  .stagehead{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .stagehead .scn{font-size:17px;font-weight:700;color:var(--sc)}
+  .stagehead .motto{font-size:12.5px;color:var(--muted)}
+  .rtl-line{font-family:Consolas,monospace;font-size:13.5px;background:var(--code-bg);color:var(--code-ink);
+    border-left:3px solid var(--sc);border-radius:0 8px 8px 0;padding:3px 10px;margin:4px 0}
+  .calc-line{font-family:Consolas,monospace;font-size:13.5px;padding:2px 10px;margin:2px 0;color:var(--ink)}
+  .calc-line b{color:var(--sc)}
+  .stnote{font-size:12.5px;color:var(--muted);margin-top:6px}
+  .sumtable{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+  .sumtable td{border:1px solid var(--line);padding:3px 8px}
+  .sumtable td:first-child{font-family:Consolas,monospace;color:var(--brand);font-weight:700;width:90px}
+
+  @keyframes flashk{0%{background:color-mix(in srgb, var(--warn) 45%, transparent)}100%{background:transparent}}
+  .flash{animation:flashk 1.1s ease-out}
+  @keyframes flashb{0%{box-shadow:0 0 0 3px var(--cE)}100%{box-shadow:0 0 0 0 transparent}}
+  .flashb{animation:flashb 1.1s ease-out}
+
+  /* ---- §4 指令×阶段 ---- */
+  .mxwrap{overflow-x:auto}
+  table.instmx{border-collapse:collapse;width:100%;font-size:12.5px;min-width:860px}
+  table.instmx th,table.instmx td{border:1px solid var(--line);padding:4px 7px;text-align:left}
+  table.instmx th{background:var(--brand-weak);text-align:center;white-space:nowrap}
+  table.instmx td.iname{font-family:Consolas,monospace;font-weight:700;white-space:nowrap;cursor:pointer;color:var(--brand)}
+  table.instmx tr:hover td{background:var(--brand-weak)}
+  table.instmx td.dim{color:color-mix(in srgb, var(--muted) 55%, transparent);text-align:center}
+  table.instmx td.has{font-family:Consolas,monospace;font-size:12px}
+  .ichips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+  .ichips button{font-family:Consolas,monospace;font-size:13px;border-radius:8px;padding:3px 12px;cursor:pointer;
+    background:var(--card);border:1px solid var(--line);color:var(--ink)}
+  .ichips button.act{background:var(--brand);border-color:var(--brand);color:#fff}
+  .detailgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  @media(max-width:860px){.detailgrid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:560px){.detailgrid{grid-template-columns:1fr}}
+  .dstg{background:var(--card);border:1px solid var(--line);border-top:4px solid var(--sc);border-radius:10px;padding:8px 12px}
+  .dstg h5{margin:0 0 4px;font-size:13.5px;color:var(--sc)}
+  .dstg .rl{font-family:Consolas,monospace;font-size:12.5px;margin:2px 0;color:var(--code-ink)}
+  .dstg.empty{opacity:.62}
+
+  /* ---- §5 测验 ---- */
+  .qcard{margin-bottom:14px}
+  .qcard .qn{font-weight:600;margin:0 0 8px}
+  .opt{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:9px;
+    padding:7px 12px;margin:6px 0;cursor:pointer;font-size:14px;font-family:inherit;color:var(--ink)}
+  .opt:hover{border-color:var(--brand)}
+  .opt.right{border-color:var(--ok);background:var(--ok-bg);color:var(--ok);font-weight:600}
+  .opt.wrong{border-color:var(--bad);background:var(--bad-bg);color:var(--bad)}
+  .opt:disabled{cursor:default}
+  .exp{display:none;background:var(--brand-weak);border:1px solid var(--brand-line);border-radius:9px;
+    padding:7px 12px;font-size:13.5px;color:var(--ink);margin-top:4px}
+  .exp.show{display:block}
+
+  /* ---- ⑤ HCL 控制逻辑 ---- */
+  table.ptab{border-collapse:collapse;width:100%;font-size:13px}
+  table.ptab th,table.ptab td{border:1px solid var(--line);padding:4px 9px;text-align:center;font-family:Consolas,monospace}
+  table.ptab th{background:var(--brand-weak);font-family:inherit;font-weight:600}
+  table.ptab td.inm{font-weight:700;text-align:left;color:var(--brand);white-space:nowrap}
+  table.ptab td.tipc{font-family:inherit;text-align:left;color:var(--muted);font-size:12px}
+  table.ptab tr:hover td{background:var(--brand-weak)}
+  .hclcode{background:var(--code-bg);color:var(--code-ink);border:1px solid var(--line);border-radius:10px;
+    padding:10px 14px;font-family:Consolas,monospace;font-size:13px;white-space:pre-wrap;line-height:1.75;margin:8px 0}
+
+  /* ---- ⑥ 性能计算器 ---- */
+  .perfstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:10px 0}
+  .pstat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px 12px;text-align:center}
+  .pstat .pv{font-family:Consolas,monospace;font-size:19px;font-weight:700;color:var(--brand)}
+  .pstat .pl{font-size:12px;color:var(--muted)}
+  input[type=range]{accent-color:var(--brand);width:170px}
+
+  /* ---- ⑦ 冒险实验室 ---- */
+  .pstats{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+  .pstat2{font-size:13px;border:1px solid var(--line);border-radius:999px;padding:2px 14px;background:var(--card)}
+  .pstat2 b{color:var(--brand);font-family:Consolas,monospace}
+  table.pipet{border-collapse:collapse;font-size:12.5px}
+  table.pipet th,table.pipet td{border:1px solid var(--line);padding:3px 6px;text-align:center;min-width:48px;font-family:Consolas,monospace}
+  table.pipet th{background:var(--brand-weak);font-weight:600}
+  table.pipet td.rlbl{text-align:left;font-size:12px;white-space:nowrap;min-width:215px;max-width:270px;overflow:hidden;text-overflow:ellipsis}
+  table.pipet td.rlbl.bubr{color:var(--muted);font-style:italic}
+  .pcell{display:inline-block;min-width:26px;border-radius:6px;font-weight:700;padding:0 4px}
+  .pcF{background:color-mix(in srgb,var(--cF) 18%,transparent);color:var(--cF)}
+  .pcD{background:color-mix(in srgb,var(--cD) 18%,transparent);color:var(--cD)}
+  .pcE{background:color-mix(in srgb,var(--cE) 18%,transparent);color:var(--cE)}
+  .pcM{background:color-mix(in srgb,var(--cM) 18%,transparent);color:var(--cM)}
+  .pcW{background:color-mix(in srgb,var(--cW) 18%,transparent);color:var(--cW)}
+  .pcbub{color:var(--muted)}
+  .fwdtag{display:block;font-size:10.5px;color:var(--cE);font-weight:400;line-height:1.35;margin-top:1px;letter-spacing:.2px}
+  .curcol{background:color-mix(in srgb,var(--warn) 10%,transparent)}
+  table.pipet td.curcol{outline:1.5px solid color-mix(in srgb,var(--warn) 55%,transparent)}
+  .evline{font-size:13.5px;padding:3px 10px;margin:3px 0;border-left:3px solid var(--brand);
+    border-radius:0 8px 8px 0;background:var(--code-bg);color:var(--code-ink)}
+  .evline.warn{border-left-color:var(--cE)}
+  .evline.ok{border-left-color:var(--ok)}
+  .fwdbtn{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;cursor:pointer;border:1px solid var(--line);
+    border-radius:999px;padding:3px 14px;background:var(--card);color:var(--muted);user-select:none}
+  .fwdbtn.on{border-color:var(--ok);color:var(--ok);background:var(--ok-bg)}
+  .fwdbtn input{accent-color:var(--ok);margin:0}
+  .fwdbtn.lock{opacity:.55;cursor:not-allowed}
+
+  footer{margin-top:60px;padding-top:16px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+
+<nav><div class="navin">
+  <span class="ttl">SEQ→PIPE</span>
+  <a href="#overview">① 阶段总览</a>
+  <a href="#signals">② 信号字典</a>
+  <a href="#sim">③ SEQ 模拟器</a>
+  <a href="#instmx">④ 指令×阶段</a>
+  <a href="#hcl">⑤ 控制逻辑</a>
+  <a href="#perf">⑥ 流水线原理</a>
+  <a href="#pipe">⑦ 冒险实验室</a>
+  <a href="#quiz">⑧ 考点测验</a>
+  <span class="qchip" id="qchip">测验 0/36</span>
+</div></nav>
+
+<header class="hero"><div class="wrap">
+  <div class="kick">CS:APP · 第 4 章 · 4.3 节 顺序实现</div>
+  <h1>从 SEQ 到 PIPE：一条 Y86-64 指令的一生，与五条指令的同生共死</h1>
+  <p class="sub">上半场（①–⑤）拆解顺序处理器 SEQ：取指 → 译码 → 执行 → 访存 → 写回 → 更新 PC，逐个搞懂 valA/valB/valE/valM 这些信号和每阶段的 HCL 控制逻辑。下半场（⑥–⑦）进入流水线：算清延迟与吞吐的账，再亲手逐周期推动一台带转发、会停顿、能冲刷错误指令的 PIPE，看懂数据冒险、加载/使用、分支预测错误和 ret。内容对应课件《4.3 顺序执行的处理器》《4.4 流水线的实现》与 <a href="../docs/04-处理器体系结构.md">docs/04-处理器体系结构.md</a> §4.3–4.4。</p>
+</div></header>
+
+<div class="wrap">
+
+<!-- ============ ① 阶段总览 ============ -->
+<section id="overview">
+  <h2><span class="chip">① 阶段总览</span> 六个阶段是一条流水线上的六道工序</h2>
+  <p class="hsub">点击任意阶段卡片查看它的职责、硬件、输入输出信号，以及"改不改状态"。数据从左往右流，最后一站决定下一条指令的地址，再回到起点。</p>
+  <div class="flowstrip" id="flowstrip"></div>
+  <div class="stg-detail card" id="stgdetail"></div>
+</section>
+
+<!-- ============ ② 信号字典 ============ -->
+<section id="signals">
+  <h2><span class="chip">② 信号字典</span> valA、valB……到底是什么、谁产生、谁在用</h2>
+  <p class="hsub">SEQ 中每个阶段的"操作"本质上就是这些信号的产生与传递。点击任意信号查看详解；下方矩阵是全图：<b style="color:var(--brand)">●</b> 该阶段产生它，<b style="color:var(--cM)">○</b> 该阶段消费它，<span class="dc">◐</span> 仅作控制使用。</p>
+  <div class="siggrid" id="siggrid"></div>
+  <div class="card" id="sigdetail" style="margin-top:10px"></div>
+  <div class="card" style="margin-top:12px;overflow-x:auto">
+    <table class="mx" id="sigmx"></table>
+    <div class="lg">● 产生（本阶段的输出）　○ 使用（作为本阶段操作的输入）　◐ 控制引用（影响本阶段的选择/使能）　●○ 同阶段既读又写（条件码）</div>
+  </div>
+</section>
+
+<!-- ============ ③ 模拟器 ============ -->
+<section id="sim">
+  <h2><span class="chip">③ 单步模拟器</span> 选一条指令，一阶段一阶段地看它执行</h2>
+  <p class="hsub">选择指令与操作数 → 点「下一步」逐阶段推进。中间是 SEQ 数据通路（当前阶段高亮、信号在线上流动），左侧是程序员可见状态（可编辑初始值！），右侧同步给出教材式 RTL 描述和代入数值后的具体计算。也可以用 ←/→ 键翻页。</p>
+
+  <div class="card simcard">
+    <div class="ctlrow" id="ctlrow">
+      <div class="ctl"><label>指令</label>
+        <select id="selType"></select></div>
+      <div class="ctl" id="ctlFn" style="display:none"><label>变体</label>
+        <select id="selFn"></select></div>
+      <div class="ctl" id="ctlRA" style="display:none"><label>rA（源/数据寄存器）</label>
+        <select id="selRA"></select></div>
+      <div class="ctl" id="ctlRB" style="display:none"><label>rB（目标/基址寄存器）</label>
+        <select id="selRB"></select></div>
+      <div class="ctl" id="ctlVC" style="display:none"><label id="lblVC">valC（立即数）</label>
+        <input type="text" id="inVC"></div>
+    </div>
+    <div class="quick" id="quickrow"></div>
+
+    <svg class="dp" viewBox="0 0 1040 268" role="img" aria-label="SEQ 数据通路示意：PC 依次连到取指、译码、执行、访存、写回，再经更新 PC 回到 PC">
+      <defs>
+        <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L6,3 L0,6 z" fill="var(--muted)"/>
+        </marker>
+      </defs>
+      <g class="dpbox" id="bx-PC"><rect x="16" y="30" width="86" height="64" rx="10"/>
+        <text class="t1" x="59" y="58">PC</text><text class="t2" x="59" y="78">程序计数器</text></g>
+      <g class="dpbox" id="bx-F"><rect x="140" y="30" width="132" height="64" rx="10"/>
+        <text class="t1" x="206" y="56">取指 F</text><text class="t2" x="206" y="76">指令内存（只读）</text>
+        <text class="t3" x="206" y="110">icode ifun rA rB valC valP</text></g>
+      <g class="dpbox" id="bx-D"><rect x="306" y="30" width="132" height="64" rx="10"/>
+        <text class="t1" x="372" y="56">译码 D</text><text class="t2" x="372" y="76">寄存器堆（读端口 A/B）</text>
+        <text class="t3" x="372" y="110">valA valB</text></g>
+      <g class="dpbox" id="bx-E"><rect x="472" y="30" width="132" height="64" rx="10"/>
+        <text class="t1" x="538" y="56">执行 E</text><text class="t2" x="538" y="76">ALU + 条件判断</text>
+        <text class="t3" x="538" y="110">valE Cnd（置 CC）</text></g>
+      <g class="dpbox" id="bx-CC"><rect x="606" y="4" width="52" height="22" rx="6"/>
+        <text class="t2" x="632" y="19">CC</text></g>
+      <g class="dpbox" id="bx-M"><rect x="638" y="30" width="132" height="64" rx="10"/>
+        <text class="t1" x="704" y="56">访存 M</text><text class="t2" x="704" y="76">数据内存（读/写）</text>
+        <text class="t3" x="704" y="110">valM</text></g>
+      <g class="dpbox" id="bx-W"><rect x="804" y="30" width="132" height="64" rx="10"/>
+        <text class="t1" x="870" y="56">写回 W</text><text class="t2" x="870" y="76">寄存器堆（写端口）</text>
+        <text class="t3" x="870" y="110">R[dstE]←valE R[dstM]←valM</text></g>
+      <g class="dpbox" id="bx-P"><rect x="472" y="186" width="132" height="54" rx="10"/>
+        <text class="t1" x="538" y="209">更新 PC</text><text class="t2" x="538" y="228">PC ← valP / valC / valM</text></g>
+
+      <line class="dparrow" id="ar0" x1="102" y1="62" x2="136" y2="62" marker-end="url(#arr)"/>
+      <line class="dparrow" id="ar1" x1="272" y1="62" x2="302" y2="62" marker-end="url(#arr)"/>
+      <line class="dparrow" id="ar2" x1="438" y1="62" x2="468" y2="62" marker-end="url(#arr)"/>
+      <line class="dparrow" id="ar3" x1="604" y1="62" x2="634" y2="62" marker-end="url(#arr)"/>
+      <line class="dparrow" id="ar4" x1="770" y1="62" x2="800" y2="62" marker-end="url(#arr)"/>
+      <path class="dparrow" id="ar5" d="M870,94 L870,213 L610,213" marker-end="url(#arr)"/>
+      <path class="dparrow" id="ar6" d="M472,213 L59,213 L59,98" marker-end="url(#arr)"/>
+
+      <text class="lbl" id="l1" x="289" y="26">icode rA rB valC valP</text>
+      <text class="lbl" id="l2" x="455" y="26">valA valB</text>
+      <text class="lbl" id="l3" x="621" y="26">valE Cnd</text>
+      <text class="lbl" id="l4" x="787" y="26">地址/数据</text>
+      <text class="lbl" id="l5" x="760" y="205">valE valM</text>
+      <text class="lbl" id="l6" x="280" y="205">新 PC → 送回 PC 寄存器</text>
+      <circle id="pulse" cx="59" cy="62" r="7"/>
+    </svg>
+
+    <div class="simgrid">
+      <div>
+        <div class="panel" style="margin-bottom:10px">
+          <h4>PC 与状态码</h4>
+          <div><span class="pcbig" id="pcval">0x100</span><span class="statchip aok" id="statchip">AOK</span></div>
+          <div class="lg" id="pcnote">顺序起点，待取指</div>
+        </div>
+        <div class="panel" style="margin-bottom:10px">
+          <h4>条件码（可编辑，试 cmov / jXX 用）</h4>
+          <div class="ccrow" id="ccrow"></div>
+        </div>
+        <div class="panel">
+          <h4>寄存器堆（初始值可编辑，改动即重放）</h4>
+          <div id="reglist"></div>
+        </div>
+      </div>
+      <div>
+        <div class="panel" style="margin-bottom:10px">
+          <h4>指令内存（0x100 处的机器码）</h4>
+          <div class="bytes" id="imem"></div>
+          <div class="legend">■ icode:ifun　■ rA:rB　■ valC（小端 8 字节）｜本指令 <b id="ilen">2</b> 字节</div>
+        </div>
+        <div class="panel">
+          <h4>数据内存（栈区窗口，8 字节/行）</h4>
+          <div id="dmem"></div>
+          <div class="legend">底色行为 %rsp 当前指向的字。模拟器在关键地址预置了数据（如 ret 的返回地址）。</div>
+        </div>
+      </div>
+      <div class="panel stagepanel" aria-live="polite">
+        <div class="stepper" id="stepper"></div>
+        <div class="btnrow">
+          <button class="btn ghost" id="btnPrev">◀ 上一步</button>
+          <button class="btn main" id="btnNext">下一步：取指 F ▶</button>
+          <button class="btn" id="btnAuto">⏵ 自动播放</button>
+          <button class="btn ghost" id="btnReset">↺ 重置</button>
+        </div>
+        <div id="stagepanel"></div>
+      </div>
+    </div>
+    <div class="tipbox">📌 严格地说，SEQ 里寄存器堆 / PC / 数据内存的写入都发生在<b>时钟上升沿</b>（一个周期的末尾）；本页为了教学把 W、M、P 三处写操作拆开逐步呈现。另外，F→D→E 是纯组合逻辑的"流动"，没有记忆——这就是第 4.4 节要往中间插流水线寄存器的原因。</div>
+  </div>
+</section>
+
+<!-- ============ ④ 指令×阶段 ============ -->
+<section id="instmx">
+  <h2><span class="chip">④ 指令×阶段</span> 13 类指令的六阶段全景对照</h2>
+  <p class="hsub">高频考点就藏在这张表里：哪些指令译码空过（irmovq / jXX）、哪些访存空过（OPq / rrmovq / irmovq / jXX…）、哪些写回空过（rmmovq）、popq 一拍写两个寄存器。点行首指令名或下方标签查看六阶段完整 RTL。</p>
+  <div class="card mxwrap">
+    <table class="instmx" id="insttable"></table>
+    <div class="lg">灰色 "—" 表示该阶段对此指令<b>空过</b>。RTL 记法：M₁/M₈ = 读 1/8 字节，R[x] = 寄存器堆，← = 赋值。</div>
+  </div>
+  <div class="card" style="margin-top:12px">
+    <div class="ichips" id="ichips"></div>
+    <div id="idetail"></div>
+  </div>
+</section>
+
+<!-- ============ ⑤ 控制逻辑 HCL ============ -->
+<section id="hcl">
+  <h2><span class="chip">⑤ 控制逻辑 HCL</span> SEQ 的大脑：每个阶段怎么选、怎么使能</h2>
+  <p class="hsub">硬件单元是肌肉（内存、ALU、寄存器堆，存数据/做运算），控制逻辑是大脑（HCL 描述的多路选择与使能信号，决定数据从哪来、往哪去、要不要动）。四个标签页覆盖考试要考的四组控制逻辑，全部提炼自课件。</p>
+  <div class="card">
+    <div class="ichips" id="hcltabs">
+      <button data-t="port" class="act">四端口 srcA/srcB/dstE/dstM</button>
+      <button data-t="alu">ALU 统一律 aluA/aluB</button>
+      <button data-t="mem">访存五连问</button>
+      <button data-t="pc">新 PC 与 Stat</button>
+    </div>
+    <div id="hclbody"></div>
+  </div>
+</section>
+
+<!-- ============ ⑥ 流水线原理与性能 ============ -->
+<section id="perf">
+  <h2><span class="chip">⑥ 流水线原理</span> 像洗车流水线一样重叠执行指令</h2>
+  <p class="hsub">洗车的三个姿势：顺序（一次只能洗一辆）、并行（多条流水线同时洗）、流水化（一条线，冲洗/打蜡/烘干三站同时各有一辆车）。处理器流水线同理：<b>不减少单条指令的延迟，甚至因为加寄存器还略增，但吞吐量大幅提升</b>。拖动滑杆，亲手算一遍课件的经典数字。</p>
+  <div class="card">
+    <div class="ctlrow">
+      <div class="ctl"><label>组合逻辑总延迟 L：<b id="vL" class="mono">300</b> ps</label>
+        <input type="range" id="inL" min="100" max="1000" step="10" value="300"></div>
+      <div class="ctl"><label>流水线寄存器延迟 r：<b id="vR" class="mono">20</b> ps</label>
+        <input type="range" id="inR" min="5" max="60" step="1" value="20"></div>
+      <div class="ctl"><label>流水线阶段数 k：<b id="vK" class="mono">3</b></label>
+        <input type="range" id="inK" min="1" max="12" step="1" value="3"></div>
+    </div>
+    <div class="perfstats">
+      <div class="pstat"><div class="pv" id="oClock">320 ps</div><div class="pl">时钟周期 = L/k + r</div></div>
+      <div class="pstat"><div class="pv" id="oLat">320 ps</div><div class="pl">总延迟 = L + k·r</div></div>
+      <div class="pstat"><div class="pv" id="oThr">3.12 GIPS</div><div class="pl">吞吐量 = 1000/(L/k+r)</div></div>
+      <div class="pstat"><div class="pv" id="oSpd">1.00×</div><div class="pl">加速比（对比 k=1）</div></div>
+      <div class="pstat"><div class="pv" id="oReg">6.3%</div><div class="pl">寄存器开销占比 k·r/(L+k·r)</div></div>
+    </div>
+    <svg id="perfsvg" viewBox="0 0 1000 150" style="width:100%;height:auto;display:block" role="img" aria-label="流水线阶段链与时钟刻度示意"></svg>
+    <div class="tipbox">📌 两大局限（课件原话）：① <b>延迟不一致</b>——吞吐量由最慢阶段决定（150/50/100ps 的三段，时钟只能取 170ps，吞吐掉到 5.88 GIPS），把逻辑均分成等延迟阶段是严峻挑战；② <b>阶段不能无限深</b>——寄存器开销占比 1/3/6 级分别为 6.25%/16.67%/28.57%。练习 4.29：延迟 = 300 + 20k ps，吞吐 = 1000/(300/k + 20) GIPS，k→∞ 时吞吐上限 = <b>1000/r = 50 GIPS</b>，而延迟→∞。</div>
+    <div class="okbox">💡 为什么必须加流水线寄存器？A、B 两段现在并行执行的是<b>不同指令</b>：B 需要的中间结果是上一周期 A 产生的，必须先存进阶段间寄存器。SEQ 的根本缺陷正是反过来：时钟要等一条指令走完全部六阶段（含访存），硬件单元只在周期的一小部分时间里被使用。</div>
+  </div>
+</section>
+
+<!-- ============ ⑦ 冒险实验室（PIPE 时空图） ============ -->
+<section id="pipe">
+  <h2><span class="chip">⑦ 冒险实验室</span> 逐周期推动一台真正的 PIPE</h2>
+  <p class="hsub">流水线图是一种时序图：行=指令，列=时钟周期。下方模拟器里 ●气泡=被注入的空操作，划线格子=被冲刷的错误路径指令，译码格上的小箭头=转发来源；右侧解说当前周期流水线控制逻辑做了什么。选场景 →「下一周期」推进。部分场景可<b>关闭数据转发</b>对比气泡数量变化。</p>
+  <div class="card">
+    <div class="ichips" id="ppsel"></div>
+    <div class="ctlrow" style="margin-top:8px;align-items:center">
+      <label class="fwdbtn on" id="fwdWrap"><input type="checkbox" id="fwdToggle" checked>🔄 数据转发开启</label>
+      <button class="btn ghost" id="pPrev">◀ 上一周期</button>
+      <button class="btn main" id="pNext">下一周期 ▶</button>
+      <button class="btn" id="pAuto">⏵ 自动播放</button>
+      <button class="btn ghost" id="pReset">↺ 重置</button>
+    </div>
+    <div class="pstats" id="pstats"></div>
+    <div class="mxwrap"><table class="pipet" id="pipetable"></table></div>
+    <div class="tipbox" id="pnote"></div>
+    <div id="pevents" aria-live="polite"></div>
+  </div>
+</section>
+
+<!-- ============ ⑧ 考点测验 ============ -->
+<section id="quiz">
+  <h2><span class="chip">⑧ 考点测验</span> 三十六道题检验 SEQ 与 PIPE 是否真正装进脑子</h2>
+  <p class="hsub">Q1–Q20 考 SEQ 六阶段，Q21–Q36 考 HCL 控制逻辑与流水线（对应课件 4.3/4.4 的全部考点）。每题单选，点击即判分并给出解析，进度保存在浏览器本地。</p>
+  <div id="quizlist"></div>
+</section>
+
+<footer>
+  姊妹页：<a href="CSAPP第4章互动学习（4.1-4.2节）.html">第 4 章 4.1–4.2 互动学习（Y86-64 汇编器/反汇编器）</a>　·
+  笔记：<a href="../docs/04-处理器体系结构.md">04-处理器体系结构</a> / <a href="../docs/04-附录-Y86-64编码速查.md">Y86-64 编码速查</a>　·
+  内容提炼自课件《4.3 处理器体系结构-顺序执行的处理器》《4.4 处理器体系结构-流水线的实现》与教材 CS:APP 3e 图 4.27（各指令六阶段）、图 4.23（SEQ）、图 4.40–4.55（PIPE/转发/控制逻辑）　·
+  课件建议课后题：4.3 章 4.13 / 4.14 / 4.17 / 4.18 / 4.20 / 4.23；4.4 章 4.32 / 4.34 / 4.39
+</footer>
+
+</div>
+
+<script>
+'use strict';
+/* ================================================================
+ * Part A：纯数据 + 模拟核心（无 DOM，可独立测试）
+ * ================================================================ */
+const R8 = ['rax','rcx','rdx','rbx','rsp','rbp','rsi','rdi'];
+const RID = {rax:0,rcx:1,rdx:2,rbx:3,rsp:4,rbp:5,rsi:6,rdi:7};
+const SCOL = {F:'--cF',D:'--cD',E:'--cE',M:'--cM',W:'--cW',P:'--cP'};
+const STG_ORDER = ['F','D','E','M','W','P'];
+const FNCC = ['恒真','le','l','e','ne','ge','g'];
+const SYM = ['+','−','&','^'];
+
+const b64 = v => BigInt.asIntN(64, BigInt(v));
+const u64 = v => BigInt.asUintN(64, BigInt(v));
+function fmtAddr(a){ return '0x' + u64(a).toString(16).toUpperCase(); }
+function fmtV(v){
+  if (v >= -4096n && v <= 4096n) return v.toString();
+  return (v < 0n ? '-0x' : '0x') + u64(v < 0n ? -v : v).toString(16).toUpperCase();
+}
+function parseV(str){
+  let s = String(str).trim().replace(/^\+/, '');
+  if (!s) return 0n;
+  let neg = false;
+  if (s[0] === '-'){ neg = true; s = s.slice(1); }
+  let v;
+  try { v = /^0x/i.test(s) ? BigInt(s) : BigInt(s.replace(/^0+(?=\d)/, '')); }
+  catch(e){ return 0n; }
+  return b64(neg ? -v : v);
+}
+const MASK7 = 1n << 63n;
+function alu(fn, a, b){            /* 结果 = b OP a */
+  a = b64(a); b = b64(b);
+  let r, of = 0;
+  if (fn === 0){ r = b + a; of = ((~(a^b) & (a^r) & MASK7) !== 0n) ? 1 : 0; }
+  else if (fn === 1){ r = b - a; of = (((a^b) & (a^r) & MASK7) !== 0n) ? 1 : 0; }
+  else if (fn === 2){ r = b & a; }
+  else { r = b ^ a; }
+  r = b64(r);
+  return { r:r, ZF:r===0n?1:0, SF:r<0n?1:0, OF:of };
+}
+function condCC(fn, cc){
+  switch(fn){
+    case 0: return 1;
+    case 1: return ((cc.SF ^ cc.OF) || cc.ZF) ? 1 : 0;
+    case 2: return (cc.SF ^ cc.OF) ? 1 : 0;
+    case 3: return cc.ZF ? 1 : 0;
+    case 4: return cc.ZF ? 0 : 1;
+    case 5: return (cc.SF ^ cc.OF) ? 0 : 1;
+    default:return ((cc.SF ^ cc.OF) || cc.ZF) ? 0 : 1;
+  }
+}
+function pushVC(arr, v){
+  for (let i = 0n; i < 8n; i++) arr.push(Number((u64(v) >> (i*8n)) & 0xffn));
+}
+function encode(ins){
+  const fn = ins.fn || 0, b = [];
+  switch(ins.type){
+    case 'halt':  b.push(0x00); break;
+    case 'nop':   b.push(0x10); break;
+    case 'rrmovq':b.push(0x20, RID[ins.rA]*16 + RID[ins.rB]); break;
+    case 'cmovXX':b.push(0x20 + fn, RID[ins.rA]*16 + RID[ins.rB]); break;
+    case 'irmovq':b.push(0x30, 0xF0 + RID[ins.rB]); pushVC(b, ins.valC); break;
+    case 'rmmovq':b.push(0x40, RID[ins.rA]*16 + RID[ins.rB]); pushVC(b, ins.valC); break;
+    case 'mrmovq':b.push(0x50, RID[ins.rA]*16 + RID[ins.rB]); pushVC(b, ins.valC); break;
+    case 'OPq':   b.push(0x60 + fn, RID[ins.rA]*16 + RID[ins.rB]); break;
+    case 'jXX':   b.push(0x70 + fn); pushVC(b, ins.valC); break;
+    case 'call':  b.push(0x80); pushVC(b, ins.valC); break;
+    case 'ret':   b.push(0x90); break;
+    case 'pushq': b.push(0xA0, RID[ins.rA]*16 + 0xF); break;
+    default:      b.push(0xB0, RID[ins.rA]*16 + 0xF); break;   /* popq */
+  }
+  return b;
+}
+function encHex(enc){ return enc.map(function(b){ return b.toString(16).padStart(2,'0').toUpperCase(); }).join(' '); }
+
+function rd8(m, a){ return m.get(u64(a)) || 0; }
+function rd64(m, a){
+  let v = 0n;
+  for (let i = 7; i >= 0; i--) v = (v << 8n) | BigInt(rd8(m, a + BigInt(i)));
+  return b64(v);
+}
+function wr64(m, a, v){
+  for (let i = 0n; i < 8n; i++) m.set(u64(a + i), Number((u64(v) >> (i*8n)) & 0xffn));
+}
+
+/* ---- ① 六阶段卡片数据 ---- */
+const STAGES = [
+ {k:'F', n:'取指', en:'Fetch', hw:'PC 寄存器 + 指令内存（只读）',
+  motto:'"我是谁？多长？下一条在哪？"',
+  job:'按 PC 从指令内存取出指令字节，拆出 icode（哪类指令）、ifun（哪种功能）、rA/rB（涉及哪些寄存器）、valC（内嵌的常数），并顺手算出顺序后继地址 valP = PC + 指令长度。',
+  inp:['PC'], out:['icode','ifun','rA','rB','valC','valP'], state:'只读，不写任何状态',
+  pitfall:'指令长度由 icode 查表得到：只有 1 / 2 / 9 / 10 字节四档。'},
+ {k:'D', n:'译码', en:'Decode', hw:'寄存器堆（读端口 A、读端口 B）',
+  motto:'"把要用的数拿出来"',
+  job:'按取指送来的名字读寄存器堆：valA ← R[rA]、valB ← R[rB]。call/ret/pushq/popq 与 %rsp 打交道时，硬件直接固定选择 %rsp，而不看 rA/rB 字段。',
+  inp:['rA','rB','（%rsp）'], out:['valA','valB'], state:'只读不写',
+  pitfall:'两个读端口未必都用：irmovq / jXX 整个阶段空过，mrmovq 只读 valB。'},
+ {k:'E', n:'执行', en:'Execute', hw:'ALU + 条件码寄存器 + 条件判断电路',
+  motto:'"真正干活的地方"',
+  job:'ALU 算出 valE——可能是运算结果（OPq）、内存地址（rmmovq/mrmovq 的 valB+valC）、新栈顶（call/pushq/ret/popq 的 %rsp±8），甚至只是"0+valA"的直通。OPq 顺带置 ZF/SF/OF；jXX/cmovXX 在这里查出 Cnd。',
+  inp:['valA','valB','valC','ifun','CC'], out:['valE','Cnd','ZF/SF/OF'], state:'只改条件码（且仅 OPq）',
+  pitfall:'valE 永远来自 ALU 输出，不存在"绕过 ALU"的值。'},
+ {k:'M', n:'访存', en:'Memory', hw:'数据内存（读端口 / 写端口）',
+  motto:'"唯一能碰数据内存的阶段"',
+  job:'按控制信号读或写：读时 valM ← M₈[地址]（mrmovq / popq / ret）；写时 M₈[地址] ← 数据（rmmovq / pushq / call）。写地址通常是 valE；ret / popq 读的地址是旧栈顶 valA。',
+  inp:['valE（地址）','valA（数据 / 旧栈顶）'], out:['valM'], state:'可能写数据内存',
+  pitfall:'纯寄存器指令（OPq、irmovq、rrmovq、cmovXX、jXX、nop…）此阶段空过。'},
+ {k:'W', n:'写回', en:'Write back', hw:'寄存器堆（写端口 dstE / dstM）',
+  motto:'"把结果记到账本上"',
+  job:'把 valE 写入 R[dstE]、valM 写入 R[dstM]；dstE/dstM 由控制逻辑按 icode 决定。cmovXX 受 Cnd 把门——条件不成立时，这条指令唯一被跳过的操作就是写回。',
+  inp:['valE','valM','dstE','dstM','Cnd'], out:['（新的寄存器值）'], state:'写寄存器堆',
+  pitfall:'popq 一拍写两个寄存器：dstE=%rsp、dstM=rA，是唯一的例外。'},
+ {k:'P', n:'更新 PC', en:'PC update', hw:'PC 寄存器（时钟上升沿写入）',
+  motto:'"决定下一条是谁"',
+  job:'新 PC 三选一：默认 valP；跳转类 PC ← Cnd ? valC : valP（call 恒为 valC）；ret 用 valM。PC 真正的写入发生在时钟上升沿。',
+  inp:['valP','valC','valM','Cnd'], out:['新 PC'], state:'写 PC',
+  pitfall:'任何指令都必经此阶段——哪怕 halt 和 nop。'}
+];
+
+/* ---- ② 信号字典数据 ---- */
+const SIGS = [
+ {n:'icode', cn:'指令代码', from:'F 产生', roles:{F:'p',D:'c',E:'c',M:'c',W:'c',P:'c'},
+  def:'指令第一个字节的高 4 位，回答"这是哪类指令"。SEQ 全部控制信号的源头。',
+  ex:'字节 60 → icode=6（OPq）；字节 30 → icode=3（irmovq）',
+  rel:'取指拆出它之后一路随行：译码用它决定要不要读寄存器、执行用它选 ALU 的用途、访存用它决定读/写/不动作、写回用它确定 dstE/dstM、PC 更新用它选新 PC 的来源。'},
+ {n:'ifun', cn:'指令功能', from:'F 产生', roles:{F:'p',E:'u',W:'u',P:'u'},
+  def:'指令第一个字节的低 4 位：OPq 选哪种运算，jXX / cmovXX 选哪个判断条件。',
+  ex:'字节 61 → OPq 且 ifun=1（subq）；字节 74 → jXX 且 ifun=4（jne）',
+  rel:'执行阶段消费它两次：选 ALU 运算、作为 Cond(CC,ifun) 查表的输入；写回（cmov 是否写）与 PC 更新（jXX 是否跳）的判定也追溯到它。'},
+ {n:'rA / rB', cn:'寄存器号字段', from:'F 产生', roles:{F:'p',D:'u',W:'u'},
+  def:'指令第二个字节的高低 4 位，指出指令涉及哪些寄存器；F 表示"没有这个操作数"。',
+  ex:'rrmovq %rax,%rbx 的第二字节 03：rA=0(%rax)、rB=3(%rbx)',
+  rel:'取指拆出 → 译码用它选择读端口 A/B 读谁 → 写回用它（经 dstE/dstM）决定写谁。注意 call/ret/pushq/popq 里 rB 字段是 F，硬件固定用 %rsp。'},
+ {n:'valC', cn:'内嵌常数', from:'F 产生', roles:{F:'p',E:'u',P:'u'},
+  def:'指令里内嵌的 64 位常数：irmovq 的立即数、rmmovq/mrmovq 的位移 D、jXX/call 的目标地址 Dest。',
+  ex:'irmovq $0x20,%rbx → valC=0x20；call 0x150 → valC=0x150',
+  rel:'取指按小端读出 8 字节得到 → 执行阶段把它加到 valB 上算地址（或经 ALU 直通装入寄存器）→ jXX/call 在 PC 更新阶段直接拿它当跳转目标。'},
+ {n:'valP', cn:'顺序后继地址', from:'F 产生', roles:{F:'p',M:'u',P:'u'},
+  def:'valP = PC + 本指令长度，即"如果不跳，下一条在哪"。取指阶段就算好了。',
+  ex:'0x100 处的 call（9 字节）→ valP = 0x109',
+  rel:'这是最容易被忽略的"勤俭持家"信号：PC 更新阶段默认用它；call 还在访存阶段把它当返回地址压进栈。'},
+ {n:'valA', cn:'操作数 A', from:'D 产生', roles:{D:'p',E:'u',M:'u'},
+  def:'译码从读端口 A 取出的寄存器值。',
+  ex:'OPq %rax,%rbx → valA = R[%rax]；pushq %rax → valA = 待压栈的数据',
+  rel:'三种去向：执行阶段当 OPq 的第二操作数；访存阶段当写进内存的数据（rmmovq/pushq）；ret/popq 还用它当读内存的地址（旧栈顶）。'},
+ {n:'valB', cn:'操作数 B', from:'D 产生', roles:{D:'p',E:'u'},
+  def:'译码从读端口 B 取出的寄存器值。',
+  ex:'mrmovq 8(%rbx) → valB = R[%rbx]（基址）；pushq → valB = R[%rsp]',
+  rel:'执行阶段的"主力输入"：OPq 的第一操作数（valE = valB OP valA，注意 B 在前）、rmmovq/mrmovq 地址加法的基址、call/pushq/ret/popq 栈指针运算的被加减数。'},
+ {n:'valE', cn:'ALU 输出', from:'E 产生', roles:{E:'p',M:'u',W:'u'},
+  def:'执行阶段 ALU 的计算结果。名字只有一个，身份随指令变：运算结果 / 内存地址 / 新栈顶。',
+  ex:'subq → valE=valB−valA；rmmovq → valE=valB+valC（地址）；call → valE=%rsp−8',
+  rel:'访存阶段拿它当读写地址；写回阶段把它写进 R[dstE]。理解 valE 的"三重身份"是看懂 SEQ 的关键一步。'},
+ {n:'Cnd', cn:'条件成立', from:'E 产生', roles:{E:'p',W:'u',P:'u'},
+  def:'执行阶段条件判断电路的输出（0 或 1）：Cnd = Cond(CC, ifun)。',
+  ex:'CC 为 ZF=1 时执行 jne → Cnd=0，不跳',
+  rel:'写回阶段它是 cmovXX 的"写使能"（Cnd=0 则写回空过）；PC 更新阶段它是 jXX 的多路选择开关（PC ← Cnd ? valC : valP）。'},
+ {n:'ZF/SF/OF', cn:'条件码', from:'E 产生（仅 OPq）/ E 读取', roles:{E:'b'},
+  def:'三个 1 位寄存器：零、负、溢出。只有 OPq 会在执行阶段按 ALU 结果更新它们。',
+  ex:'100 − 100 → ZF=1；两负数相加得正 → OF=1',
+  rel:'同在执行阶段"既读又写"：jXX / cmovXX 读它们算 Cnd，OPq 写它们。条件码像一块小黑板，OPq 写、jXX/cmov 看。'},
+ {n:'valM', cn:'内存读数', from:'M 产生', roles:{M:'p',W:'u',P:'u'},
+  def:'访存阶段从数据内存读出的 8 字节值。',
+  ex:'mrmovq 0(%rsp),%rcx → valM = M₈[R[%rsp]]',
+  rel:'写回阶段写进 R[dstM]（mrmovq / popq）；ret 还把它直接送上 PC——六种新 PC 来源里唯一取自内存的。'},
+ {n:'dstE / dstM', cn:'写回目标', from:'控制逻辑（按 icode）', roles:{W:'u'},
+  def:'写回阶段两个写端口的寄存器号与写使能：写什么值（valE/valM）、写到谁、要不要写。',
+  ex:'OPq → dstE=rB、dstM=R8（不写）；popq → dstE=%rsp 且 dstM=rA',
+  rel:'取指的 icode 决定它们；执行阶段产生 valE/valM 与 Cnd 之后，写回阶段才真正按它们落笔。cmov 的"条件"最终就落在写使能上。'},
+ {n:'Stat', cn:'状态码', from:'F 可置 INS/HLT，M 可置 ADR', roles:{F:'p',M:'p'},
+  def:'程序状态：AOK（正常）/ HLT（halt 停机）/ ADR（地址错）/ INS（非法指令）。',
+  ex:'halt 在取指阶段就置 Stat=HLT',
+  rel:'本页演示 halt：F 阶段置 HLT 后，P 阶段虽然仍更新 PC，但下个周期处理器不再取指。流水线版本里异常处理（4.4.6）会复杂得多。'}
+];
+
+/* ---- ④ 指令六阶段描述（RTL + 摘要） ---- */
+const DESC = {
+ halt:{title:'halt — 停机', enc:'1 字节：00', special:'取指阶段就把 Stat 置为 HLT；P 阶段仍更新 PC，但下个周期不再取指。',
+  stages:{
+   F:{sum:'取字节；Stat←HLT', rtl:['icode:ifun ← M₁[PC]','valP ← PC + 1','Stat ← HLT'], produce:['icode','ifun','valP','Stat']},
+   D:{sum:'—', rtl:['（空过）'], produce:[]},
+   E:{sum:'—', rtl:['（空过）'], produce:[]},
+   M:{sum:'—', rtl:['（空过）'], produce:[]},
+   W:{sum:'—', rtl:['（空过）'], produce:[]},
+   P:{sum:'PC←valP（已停机）', rtl:['PC ← valP'], produce:[]}}},
+ nop:{title:'nop — 空操作', enc:'1 字节：10', special:'六个阶段里只有 F 和 P 干活——考试爱考"哪些阶段可以为空"。',
+  stages:{
+   F:{sum:'取字节；valP=PC+1', rtl:['icode:ifun ← M₁[PC]','valP ← PC + 1'], produce:['icode','ifun','valP']},
+   D:{sum:'—', rtl:['（空过）'], produce:[]},
+   E:{sum:'—', rtl:['（空过）'], produce:[]},
+   M:{sum:'—', rtl:['（空过）'], produce:[]},
+   W:{sum:'—', rtl:['（空过）'], produce:[]},
+   P:{sum:'PC←valP', rtl:['PC ← valP'], produce:[]}}},
+ rrmovq:{title:'rrmovq rA, rB — 寄存器传送', enc:'2 字节：20 rA rB', special:'没有访存、没有 valM；ALU 只是把 valA 加 0"直通"过去。',
+  stages:{
+   F:{sum:'取 rA:rB；valP=PC+2', rtl:['icode:ifun ← M₁[PC]','rA:rB ← M₁[PC+1]','valP ← PC + 2'], produce:['icode','ifun','rA','rB','valP']},
+   D:{sum:'valA←R[rA]', rtl:['valA ← R[rA]'], produce:['valA']},
+   E:{sum:'valE←0+valA（直通）', rtl:['valE ← 0 + valA'], produce:['valE']},
+   M:{sum:'—', rtl:['（空过）'], produce:[]},
+   W:{sum:'R[rB]←valE', rtl:['R[rB] ← valE'], produce:[]},
+   P:{sum:'PC←valP', rtl:['PC ← valP'], produce:[]}}},
+ cmovXX:{title:'cmovXX rA, rB — 条件传送', enc:'2 字节：2f rA rB（fn=1~6）', special:'valE 早就算好了，"传不传"由写回阶段的 Cnd 把门——条件不满足时唯一被跳过的就是写回。',
+  stages:{
+   F:{sum:'取 rA:rB；valP=PC+2', rtl:['icode:ifun ← M₁[PC]','rA:rB ← M₁[PC+1]','valP ← PC + 2'], produce:['icode','ifun','rA','rB','valP']},
+   D:{sum:'valA←R[rA]', rtl:['valA ← R[rA]'], produce:['valA']},
+   E:{sum:'valE←0+valA；Cnd=Cond', rtl:['valE ← 0 + valA','Cnd ← Cond(CC, ifun)'], produce:['valE','Cnd']},
+   M:{sum:'—', rtl:['（空过）'], produce:[]},
+   W:{sum:'Cnd ? R[rB]←valE', rtl:['Cnd ? R[rB] ← valE : 不写'], produce:[]},
+   P:{sum:'PC←valP', rtl:['PC ← valP'], produce:[]}}},
+ irmovq:{title:'irmovq V, rB — 立即数装入', enc:'10 字节：30 F rB + 8 字节 valC（小端）', special:'译码阶段完全空过：操作数就是 valC，不需要读寄存器。',
+  stages:{
+   F:{sum:'取 valC；valP=PC+10', rtl:['icode:ifun ← M₁[PC]','rB ← M₁[PC+1]','valC ← M₈[PC+2]','valP ← PC + 10'], produce:['icode','ifun','rB','valC','valP']},
+   D:{sum:'—（不读寄存器）', rtl:['（空过：不需要读寄存器）'], produce:[]},
+   E:{sum:'valE←0+valC（直通）', rtl:['valE ← 0 + valC'], produce:['valE']},
+   M:{sum:'—', rtl:['（空过）'], produce:[]},
+   W:{sum:'R[rB]←valE', rtl:['R[rB] ← valE'], produce:[]},
+   P:{sum:'PC←valP', rtl:['PC ← valP'], produce:[]}}},
+ rmmovq:{title:'rmmovq rA, D(rB) — 寄存器存内存', enc:'10 字节：40 rA rB + D', special:'ALU 干的是地址加法 valB+valC；写回阶段空过——结果进内存，不进寄存器。',
+  stages:{
+   F:{sum:'取 rA:rB 与 D(valC)', rtl:['icode:ifun ← M₁[PC]','rA:rB ← M₁[PC+1]','valC ← M₈[PC+2]','valP ← PC + 10'], produce:['icode','ifun','rA','rB','valC','valP']},
+   D:{sum:'valA←R[rA]；valB←R[rB]', rtl:['valA ← R[rA]','valB ← R[rB]'], produce:['valA','valB']},
+   E:{sum:'valE←valB+valC（地址）', rtl:['valE ← valB + valC'], produce:['valE']},
+   M:{sum:'M₈[valE]←valA', rtl:['M₈[valE] ← valA'], produce:[]},
+   W:{sum:'—', rtl:['（空过：不写寄存器）'], produce:[]},
+   P:{sum:'PC←valP', rtl:['PC ← valP'], produce:[]}}},
+ mrmovq:{title:'mrmovq D(rB), rA — 内存装寄存器', enc:'10 字节：50 rA rB + D', special:'valE 是地址不是结果；写回用 dstM 端口写 valM。译码只读 valB（rA 是写目标，不读）。',
+  stages:{
+   F:{sum:'取 rA:rB 与 D(valC)', rtl:['icode:ifun ← M₁[PC]','rA:rB ← M₁[PC+1]','valC ← M₈[PC+2]','valP ← PC + 10'], produce:['icode','ifun','rA','rB','valC','valP']},
+   D:{sum:'valB←R[rB]', rtl:['valB ← R[rB]'], produce:['valB']},
+   E:{sum:'valE←valB+valC（地址）', rtl:['valE ← valB + valC'], produce:['valE']},
+   M:{sum:'valM←M₈[valE]', rtl:['valM ← M₈[valE]'], produce:['valM']},
+   W:{sum:'R[rA]←valM（dstM）', rtl:['R[rA] ← valM'], produce:[]},
+   P:{sum:'PC←valP', rtl:['PC ← valP'], produce:[]}}},
+ OPq:{title:'OPq rA, rB — 算术逻辑（addq/subq/andq/xorq）', enc:'2 字节：6f rA rB（fn=0~3）', special:'唯一更新条件码 ZF/SF/OF 的指令；注意顺序是 valE = valB OP valA（B 在前）。',
+  stages:{
+   F:{sum:'取 rA:rB；valP=PC+2', rtl:['icode:ifun ← M₁[PC]','rA:rB ← M₁[PC+1]','valP ← PC + 2'], produce:['icode','ifun','rA','rB','valP']},
+   D:{sum:'valA←R[rA]；valB←R[rB]', rtl:['valA ← R[rA]','valB ← R[rB]'], produce:['valA','valB']},
+   E:{sum:'valE←valB⊕valA；置CC', rtl:['valE ← valB ⊕ valA　（⊕ = +/−/&/^，由 ifun 选）','按 valE 置 ZF/SF/OF'], produce:['valE','ZF/SF/OF']},
+   M:{sum:'—', rtl:['（空过：纯寄存器运算）'], produce:[]},
+   W:{sum:'R[rB]←valE', rtl:['R[rB] ← valE'], produce:[]},
+   P:{sum:'PC←valP', rtl:['PC ← valP'], produce:[]}}},
+ jXX:{title:'jXX Dest — 条件跳转（jmp/jle/jl/je/jne/jge/jg）', enc:'9 字节：7f + Dest（小端）', special:'译码/访存/写回全空过；命脉在 E（算 Cnd）和 P（选 valC 还是 valP）。',
+  stages:{
+   F:{sum:'取 Dest(valC)；valP=PC+9', rtl:['icode:ifun ← M₁[PC]','valC ← M₈[PC+1]','valP ← PC + 9'], produce:['icode','ifun','valC','valP']},
+   D:{sum:'—', rtl:['（空过：不读寄存器）'], produce:[]},
+   E:{sum:'Cnd=Cond(CC,ifun)', rtl:['Cnd ← Cond(CC, ifun)'], produce:['Cnd']},
+   M:{sum:'—', rtl:['（空过）'], produce:[]},
+   W:{sum:'—', rtl:['（空过）'], produce:[]},
+   P:{sum:'PC←Cnd?valC:valP', rtl:['PC ← Cnd ? valC : valP'], produce:[]}}},
+ call:{title:'call Dest — 调用', enc:'9 字节：80 + Dest（小端）', special:'三个阶段各写一样东西：M 压返回地址 valP、W 改 %rsp、P 跳 valC。译码只读 %rsp。',
+  stages:{
+   F:{sum:'取 Dest；valP=PC+9', rtl:['icode:ifun ← M₁[PC]','valC ← M₈[PC+1]','valP ← PC + 9'], produce:['icode','ifun','valC','valP']},
+   D:{sum:'valB←R[%rsp]', rtl:['valB ← R[%rsp]'], produce:['valB']},
+   E:{sum:'valE←valB−8（新栈顶）', rtl:['valE ← valB − 8'], produce:['valE']},
+   M:{sum:'M₈[valE]←valP', rtl:['M₈[valE] ← valP　（压入返回地址）'], produce:[]},
+   W:{sum:'R[%rsp]←valE', rtl:['R[%rsp] ← valE'], produce:[]},
+   P:{sum:'PC←valC', rtl:['PC ← valC'], produce:[]}}},
+ ret:{title:'ret — 返回', enc:'1 字节：90', special:'新 PC 来自 valM（访存弹出的返回地址）——唯一从内存来的 PC。',
+  stages:{
+   F:{sum:'取字节；valP=PC+1', rtl:['icode:ifun ← M₁[PC]','valP ← PC + 1'], produce:['icode','ifun','valP']},
+   D:{sum:'valA,valB←R[%rsp]', rtl:['valA ← R[%rsp]','valB ← R[%rsp]'], produce:['valA','valB']},
+   E:{sum:'valE←valB+8', rtl:['valE ← valB + 8'], produce:['valE']},
+   M:{sum:'valM←M₈[valA]', rtl:['valM ← M₈[valA]　（弹出返回地址）'], produce:['valM']},
+   W:{sum:'R[%rsp]←valE', rtl:['R[%rsp] ← valE'], produce:[]},
+   P:{sum:'PC←valM', rtl:['PC ← valM'], produce:[]}}},
+ pushq:{title:'pushq rA — 压栈', enc:'2 字节：A0 rA F', special:'valE = valB−8 既是新栈顶也是写内存的地址；寄存器字节里 rB=F，硬件固定读 %rsp。',
+  stages:{
+   F:{sum:'取 rA；valP=PC+2', rtl:['icode:ifun ← M₁[PC]','rA ← M₁[PC+1]','valP ← PC + 2'], produce:['icode','ifun','rA','valP']},
+   D:{sum:'valA←R[rA]；valB←R[%rsp]', rtl:['valA ← R[rA]','valB ← R[%rsp]'], produce:['valA','valB']},
+   E:{sum:'valE←valB−8（新栈顶）', rtl:['valE ← valB − 8'], produce:['valE']},
+   M:{sum:'M₈[valE]←valA', rtl:['M₈[valE] ← valA'], produce:[]},
+   W:{sum:'R[%rsp]←valE', rtl:['R[%rsp] ← valE'], produce:[]},
+   P:{sum:'PC←valP', rtl:['PC ← valP'], produce:[]}}},
+ popq:{title:'popq rA — 出栈', enc:'2 字节：B0 rA F', special:'唯一一拍写两个寄存器的指令（dstE=%rsp、dstM=rA）；读内存用旧栈顶 valA，不是 valE。',
+  stages:{
+   F:{sum:'取 rA；valP=PC+2', rtl:['icode:ifun ← M₁[PC]','rA ← M₁[PC+1]','valP ← PC + 2'], produce:['icode','ifun','rA','valP']},
+   D:{sum:'valA,valB←R[%rsp]', rtl:['valA ← R[%rsp]','valB ← R[%rsp]'], produce:['valA','valB']},
+   E:{sum:'valE←valB+8', rtl:['valE ← valB + 8'], produce:['valE']},
+   M:{sum:'valM←M₈[valA]', rtl:['valM ← M₈[valA]　（按旧栈顶读）'], produce:['valM']},
+   W:{sum:'R[%rsp]←valE；R[rA]←valM', rtl:['R[%rsp] ← valE　（dstE）','R[rA] ← valM　（dstM）'], produce:[]},
+   P:{sum:'PC←valP', rtl:['PC ← valP'], produce:[]}}}
+};
+const ORDER = ['halt','nop','rrmovq','cmovXX','irmovq','rmmovq','mrmovq','OPq','jXX','call','ret','pushq','popq'];
+
+/* ---- 模拟初始状态（寄存器/条件码初始值可被 UI 编辑） ---- */
+let REG_INIT = {rax:100n, rcx:7n, rdx:-12n, rbx:50n, rsp:0x200n, rbp:0n, rsi:0n, rdi:0n};
+let CC_INIT = {ZF:0, SF:0, OF:0};
+
+function baseState(ins){
+  const regs = Object.assign({}, REG_INIT);
+  const cc = Object.assign({}, CC_INIT);
+  const mem = new Map();
+  if (ins.type === 'mrmovq') wr64(mem, regs[ins.rB] + b64(ins.valC), 0x2An);
+  if (ins.type === 'ret')    wr64(mem, regs.rsp, 0x150n);
+  if (ins.type === 'popq')   wr64(mem, regs.rsp, 0x99n);
+  return { pc:0x100n, regs:regs, cc:cc, mem:mem, stat:'AOK' };
+}
+function memWindow(ins){
+  const cands = [REG_INIT.rsp];
+  if (ins.type === 'rmmovq' || ins.type === 'mrmovq') cands.push(b64(REG_INIT[ins.rB] + b64(ins.valC)));
+  if (ins.type === 'pushq' || ins.type === 'call')    cands.push(REG_INIT.rsp - 8n);
+  let base = cands.reduce(function(m,c){ return c < m ? c : m; });
+  base = u64(base) & ~7n;
+  if (base > 0x28n) base -= 0x28n;
+  return base;   /* 向上展示 11 个字 */
+}
+function snap(st){
+  return { pc:st.pc, regs:Object.assign({},st.regs), cc:Object.assign({},st.cc), mem:new Map(st.mem), stat:st.stat };
+}
+function diff(a, b){
+  const d = { regs:[], cc:[], pc:false, mem:[] };
+  R8.forEach(function(r){ if (a.regs[r] !== b.regs[r]) d.regs.push(r); });
+  ['ZF','SF','OF'].forEach(function(c){ if (a.cc[c] !== b.cc[c]) d.cc.push(c); });
+  d.pc = a.pc !== b.pc;
+  const wset = new Set();
+  const keys = new Set([].concat(Array.from(a.mem.keys()), Array.from(b.mem.keys())));
+  keys.forEach(function(k){ if (a.mem.get(k) !== b.mem.get(k)) wset.add(u64(k) & ~7n); });
+  wset.forEach(function(w){ d.mem.push(w); });
+  return d;
+}
+
+/* ---- 六阶段执行引擎：产生 RTL（符号）+ 计算（代入数值）+ 状态快照 ---- */
+function execStages(ins, st){
+  const s = snap(st);
+  const snaps = [snap(s)];
+  const steps = [];
+  const env = {};
+  const t = ins.type, fn = ins.fn || 0;
+  const enc = encode(ins), len = enc.length;
+  const D = DESC[t];
+  const ICN = {halt:0,nop:1,rrmovq:2,cmovXX:2,irmovq:3,rmmovq:4,mrmovq:5,OPq:6,jXX:7,call:8,ret:9,pushq:10,popq:11};
+  function push(k, calc, noteOverride){
+    const ds = D.stages[k];
+    steps.push({ k:k, calc:calc, note:noteOverride || ds.note || '',
+                 rtl:ds.rtl, produce:ds.produce });
+    snaps.push(snap(s));
+  }
+  const emptyCalc = function(why){ return [why || '（本阶段无操作）']; };
+
+  /* ---------- 取指 F ---------- */
+  env.icode = ICN[t]; env.ifun = fn;
+  env.valP = b64(s.pc + BigInt(len));
+  const fCalc = ['PC = ' + fmtAddr(s.pc) + '，读 ' + len + ' 个指令字节：' + encHex(enc)];
+  if (len === 2) fCalc.push('rA = %' + ins.rA + '、rB = %' + ins.rB);
+  if (len === 9 || len === 10){ env.valC = b64(ins.valC); fCalc.push('valC = ' + fmtV(env.valC)); }
+  fCalc.push('valP = ' + fmtAddr(s.pc) + ' + ' + len + ' = ' + fmtAddr(env.valP));
+  if (t === 'halt'){ s.stat = 'HLT'; fCalc.push('Stat ← HLT（准备停机）'); }
+  push('F', fCalc);
+
+  /* ---------- 其余五阶段 ---------- */
+  if (t === 'rrmovq' || t === 'cmovXX'){
+    env.valA = s.regs[ins.rA];
+    push('D', ['valA = R[%' + ins.rA + '] = ' + fmtV(env.valA)]);
+    const al = alu(0, env.valA, 0n); env.valE = al.r;
+    const eCalc = ['valE = 0 + valA = 0 + ' + fmtV(env.valA) + ' = ' + fmtV(env.valE)];
+    if (t === 'cmovXX'){
+      env.Cnd = condCC(fn, s.cc);
+      eCalc.push('Cnd = Cond(' + FNCC[fn] + ', CC{ZF=' + s.cc.ZF + ',SF=' + s.cc.SF + ',OF=' + s.cc.OF + '}) = ' + env.Cnd);
+    }
+    push('E', eCalc);
+    push('M', emptyCalc());
+    if (t === 'rrmovq' || env.Cnd === 1){
+      s.regs[ins.rB] = env.valE;
+      push('W', ['R[%' + ins.rB + '] ← valE = ' + fmtV(env.valE) + '　（dstE=%' + ins.rB + '）']);
+    } else {
+      push('W', ['Cnd = 0：条件不满足，写回被"拦下"'], 'cmovXX 的"条件"最终落在写回端口的写使能上——整条指令只有这一步被跳过。');
+    }
+    s.pc = env.valP; push('P', ['PC ← valP = ' + fmtV(env.valP)]);
+
+  } else if (t === 'irmovq'){
+    push('D', ['不需要读寄存器：操作数就是 valC = ' + fmtV(env.valC)]);
+    const al = alu(0, env.valC, 0n); env.valE = al.r;
+    push('E', ['valE = 0 + valC = ' + fmtV(env.valC)]);
+    push('M', emptyCalc());
+    s.regs[ins.rB] = env.valE;
+    push('W', ['R[%' + ins.rB + '] ← valE = ' + fmtV(env.valE) + '　（dstE=%' + ins.rB + '）']);
+    s.pc = env.valP; push('P', ['PC ← valP = ' + fmtV(env.valP)]);
+
+  } else if (t === 'OPq'){
+    env.valA = s.regs[ins.rA]; env.valB = s.regs[ins.rB];
+    push('D', ['valA = R[%' + ins.rA + '] = ' + fmtV(env.valA),
+               'valB = R[%' + ins.rB + '] = ' + fmtV(env.valB)]);
+    const al = alu(fn, env.valA, env.valB);
+    env.valE = al.r;
+    s.cc = { ZF:al.ZF, SF:al.SF, OF:al.OF };
+    push('E', ['valE = valB ' + SYM[fn] + ' valA = ' + fmtV(env.valB) + ' ' + SYM[fn] + ' ' + fmtV(env.valA) + ' = ' + fmtV(env.valE),
+               '新条件码：ZF=' + al.ZF + '、SF=' + al.SF + '、OF=' + al.OF]);
+    push('M', emptyCalc('（纯寄存器运算，不碰数据内存）'));
+    s.regs[ins.rB] = env.valE;
+    push('W', ['R[%' + ins.rB + '] ← valE = ' + fmtV(env.valE) + '　（dstE=%' + ins.rB + '）']);
+    s.pc = env.valP; push('P', ['PC ← valP = ' + fmtV(env.valP)]);
+
+  } else if (t === 'rmmovq'){
+    env.valA = s.regs[ins.rA]; env.valB = s.regs[ins.rB];
+    push('D', ['valA = R[%' + ins.rA + '] = ' + fmtV(env.valA),
+               'valB = R[%' + ins.rB + '] = ' + fmtV(env.valB)]);
+    const al = alu(0, env.valC, env.valB); env.valE = al.r;
+    push('E', ['valE = valB + valC = ' + fmtV(env.valB) + ' + ' + fmtV(env.valC) + ' = ' + fmtV(env.valE) + '　（内存地址）']);
+    wr64(s.mem, env.valE, env.valA);
+    push('M', ['内存[' + fmtAddr(env.valE) + '] ← valA = ' + fmtV(env.valA)]);
+    push('W', emptyCalc('（结果进了内存，不写寄存器）'));
+    s.pc = env.valP; push('P', ['PC ← valP = ' + fmtV(env.valP)]);
+
+  } else if (t === 'mrmovq'){
+    env.valB = s.regs[ins.rB];
+    push('D', ['valB = R[%' + ins.rB + '] = ' + fmtV(env.valB)], 'rA 是写回目标（%'+ins.rA+'），译码阶段不读它。');
+    const al = alu(0, env.valC, env.valB); env.valE = al.r;
+    push('E', ['valE = valB + valC = ' + fmtV(env.valB) + ' + ' + fmtV(env.valC) + ' = ' + fmtV(env.valE) + '　（内存地址）']);
+    env.valM = rd64(s.mem, env.valE);
+    push('M', ['valM = 内存[' + fmtAddr(env.valE) + '] = ' + fmtV(env.valM)]);
+    s.regs[ins.rA] = env.valM;
+    push('W', ['R[%' + ins.rA + '] ← valM = ' + fmtV(env.valM) + '　（dstM=%' + ins.rA + '）']);
+    s.pc = env.valP; push('P', ['PC ← valP = ' + fmtV(env.valP)]);
+
+  } else if (t === 'jXX'){
+    push('D', ['不需要读寄存器']);
+    env.Cnd = condCC(fn, s.cc);
+    const eCalc = ['Cnd = Cond(' + FNCC[fn] + ', CC{ZF=' + s.cc.ZF + ',SF=' + s.cc.SF + ',OF=' + s.cc.OF + '}) = ' + env.Cnd];
+    if (fn === 0) eCalc.push('jmp 无条件：Cnd 恒为 1');
+    push('E', eCalc);
+    push('M', emptyCalc());
+    push('W', emptyCalc());
+    s.pc = (env.Cnd === 1) ? env.valC : env.valP;
+    push('P', ['PC ← ' + env.Cnd + ' ? ' + fmtV(env.valC) + ' : ' + fmtV(env.valP) + ' = ' + fmtAddr(s.pc)]);
+
+  } else if (t === 'call'){
+    env.valB = s.regs.rsp;
+    push('D', ['valB = R[%rsp] = ' + fmtV(env.valB)]);
+    const al = alu(1, 8n, env.valB); env.valE = al.r;
+    push('E', ['valE = valB − 8 = ' + fmtV(env.valB) + ' − 8 = ' + fmtV(env.valE) + '　（新栈顶）']);
+    wr64(s.mem, env.valE, env.valP);
+    push('M', ['内存[' + fmtAddr(env.valE) + '] ← valP = ' + fmtV(env.valP) + '　（压入返回地址）']);
+    s.regs.rsp = env.valE;
+    push('W', ['R[%rsp] ← valE = ' + fmtV(env.valE)]);
+    s.pc = env.valC;
+    push('P', ['PC ← valC = ' + fmtV(env.valC) + '　（跳到函数入口）']);
+
+  } else if (t === 'ret'){
+    env.valA = s.regs.rsp; env.valB = s.regs.rsp;
+    push('D', ['valA = valB = R[%rsp] = ' + fmtV(env.valA)]);
+    const al = alu(0, 8n, env.valB); env.valE = al.r;
+    push('E', ['valE = valB + 8 = ' + fmtV(env.valB) + ' + 8 = ' + fmtV(env.valE)]);
+    env.valM = rd64(s.mem, env.valA);
+    push('M', ['valM = 内存[' + fmtAddr(env.valA) + '] = ' + fmtV(env.valM) + '　（弹出返回地址）']);
+    s.regs.rsp = env.valE;
+    push('W', ['R[%rsp] ← valE = ' + fmtV(env.valE)]);
+    s.pc = env.valM;
+    push('P', ['PC ← valM = ' + fmtV(env.valM)]);
+
+  } else if (t === 'pushq'){
+    env.valA = s.regs[ins.rA]; env.valB = s.regs.rsp;
+    push('D', ['valA = R[%' + ins.rA + '] = ' + fmtV(env.valA),
+               'valB = R[%rsp] = ' + fmtV(env.valB)], '寄存器字节里 rB=F：硬件固定读 %rsp。');
+    const al = alu(1, 8n, env.valB); env.valE = al.r;
+    push('E', ['valE = valB − 8 = ' + fmtV(env.valB) + ' − 8 = ' + fmtV(env.valE) + '　（新栈顶=写入地址）']);
+    wr64(s.mem, env.valE, env.valA);
+    push('M', ['内存[' + fmtAddr(env.valE) + '] ← valA = ' + fmtV(env.valA)]);
+    s.regs.rsp = env.valE;
+    push('W', ['R[%rsp] ← valE = ' + fmtV(env.valE)]);
+    s.pc = env.valP; push('P', ['PC ← valP = ' + fmtV(env.valP)]);
+
+  } else if (t === 'popq'){
+    env.valA = s.regs.rsp; env.valB = s.regs.rsp;
+    push('D', ['valA = valB = R[%rsp] = ' + fmtV(env.valA)]);
+    const al = alu(0, 8n, env.valB); env.valE = al.r;
+    push('E', ['valE = valB + 8 = ' + fmtV(env.valB) + ' + 8 = ' + fmtV(env.valE)]);
+    env.valM = rd64(s.mem, env.valA);
+    push('M', ['valM = 内存[' + fmtAddr(env.valA) + '] = ' + fmtV(env.valM) + '　（按旧栈顶读）']);
+    s.regs.rsp = env.valE; s.regs[ins.rA] = env.valM;
+    push('W', ['R[%rsp] ← valE = ' + fmtV(env.valE),
+               'R[%' + ins.rA + '] ← valM = ' + fmtV(env.valM) + '　（一拍写两个：dstE=%rsp、dstM=%' + ins.rA + '）']);
+    s.pc = env.valP; push('P', ['PC ← valP = ' + fmtV(env.valP)]);
+
+  } else {   /* halt / nop */
+    push('D', emptyCalc());
+    push('E', emptyCalc());
+    push('M', emptyCalc());
+    push('W', emptyCalc());
+    s.pc = env.valP;
+    const pNote = t === 'halt' ? 'Stat=HLT：PC 虽仍更新，但下个周期处理器不再取指。' : '什么都没发生，只有 PC 前进 1 字节。';
+    push('P', ['PC ← valP = ' + fmtV(env.valP)], pNote);
+  }
+
+  return { steps:steps, snaps:snaps, env:env, enc:enc, newPC:s.pc, stat:s.stat };
+}
+
+/* ---- 默认指令参数（也供 ④ 节"到模拟器里试"） ---- */
+const DEFINS = {
+  halt:{type:'halt'}, nop:{type:'nop'},
+  rrmovq:{type:'rrmovq', rA:'rax', rB:'rcx'},
+  cmovXX:{type:'cmovXX', fn:4, rA:'rax', rB:'rcx'},
+  irmovq:{type:'irmovq', valC:0x1234n, rB:'rbx'},
+  rmmovq:{type:'rmmovq', rA:'rax', rB:'rsp', valC:8n},
+  mrmovq:{type:'mrmovq', rA:'rcx', rB:'rsp', valC:0n},
+  OPq:{type:'OPq', fn:0, rA:'rax', rB:'rbx'},
+  jXX:{type:'jXX', fn:4, valC:0x150n},
+  call:{type:'call', valC:0x150n},
+  ret:{type:'ret'},
+  pushq:{type:'pushq', rA:'rax'},
+  popq:{type:'popq', rA:'rcx'}
+};
+const QUICK = [
+  {label:'OPq 加法', ins:{type:'OPq', fn:0, rA:'rax', rB:'rbx'}},
+  {label:'irmovq 装入', ins:{type:'irmovq', valC:0x1234n, rB:'rbx'}},
+  {label:'mrmovq 读内存', ins:{type:'mrmovq', rA:'rcx', rB:'rsp', valC:0n}},
+  {label:'rmmovq 写内存', ins:{type:'rmmovq', rA:'rax', rB:'rsp', valC:8n}},
+  {label:'call 压栈跳转', ins:{type:'call', valC:0x150n}},
+  {label:'ret 弹栈返回', ins:{type:'ret'}},
+  {label:'popq 一拍双写', ins:{type:'popq', rA:'rcx'}},
+  {label:'cmovne 条件写回', ins:{type:'cmovXX', fn:4, rA:'rax', rB:'rcx'}},
+  {label:'jne 条件跳转', ins:{type:'jXX', fn:4, valC:0x150n}}
+];
+
+/* ---- ⑤ 四端口与 ALU 统一律数据（源自课件 4.3 第 39–46 页） ---- */
+const PORTS = {
+  halt:  {srcA:null, srcB:null, dstE:null, dstM:null, tip:'六阶段只有 F 和 P 干活'},
+  nop:   {srcA:null, srcB:null, dstE:null, dstM:null, tip:'什么都不读不写'},
+  rrmovq:{srcA:'rA', srcB:null, dstE:'rB', dstM:null, tip:'读源写目的，经 ALU 直通'},
+  cmovXX:{srcA:'rA', srcB:null, dstE:'rB*', dstM:null, tip:'* Cnd=0 时 dstE=RNONE，不写'},
+  irmovq:{srcA:null, srcB:null, dstE:'rB', dstM:null, tip:'两个读端口都闲置'},
+  rmmovq:{srcA:'rA', srcB:'rB', dstE:null, dstM:null, tip:'唯一不写任何寄存器的访存指令'},
+  mrmovq:{srcA:null, srcB:'rB', dstE:null, dstM:'rA', tip:'只读基址；rA 留给 dstM'},
+  OPq:   {srcA:'rA', srcB:'rB', dstE:'rB', dstM:null, tip:'valE = valB ⊕ valA，并置 CC'},
+  jXX:   {srcA:null, srcB:null, dstE:null, dstM:null, tip:'不读不写寄存器，只算 Cnd'},
+  call:  {srcA:null, srcB:'rsp', dstE:'rsp', dstM:null, tip:'只跟 %rsp 打交道'},
+  ret:   {srcA:'rsp', srcB:'rsp', dstE:'rsp', dstM:null, tip:'两个读端口都读 %rsp'},
+  pushq: {srcA:'rA', srcB:'rsp', dstE:'rsp', dstM:null, tip:'寄存器字节里 rB=F'},
+  popq:  {srcA:'rsp', srcB:'rsp', dstE:'rsp', dstM:'rA', tip:'唯一双写：dstE=%rsp、dstM=rA'}
+};
+function portInfo(ins){
+  const p = PORTS[ins.type];
+  const sub = function(v){
+    if (!v) return '—';
+    if (v === 'rsp') return '%rsp';
+    if (v === 'rA') return ins.rA ? '%' + ins.rA : '—';
+    if (v === 'rB') return ins.rB ? '%' + ins.rB : '—';
+    return v;
+  };
+  return { srcA:sub(p.srcA), srcB:sub(p.srcB), dstE:sub(p.dstE), dstM:sub(p.dstM), tip:p.tip };
+}
+const ALUTAB = [
+  {t:'OPq',    a:'valA', b:'valB', f:'ifun', m:'valE ← valB ⊕ valA（唯一按 ifun 选运算的指令）'},
+  {t:'rrmovq / cmovXX', a:'valA', b:'0',    f:'加法', m:'valE ← 0 + valA（直通）'},
+  {t:'irmovq', a:'valC', b:'0',    f:'加法', m:'valE ← 0 + valC（直通）'},
+  {t:'rmmovq / mrmovq', a:'valC', b:'valB', f:'加法', m:'valE ← valB + valC（算有效地址）'},
+  {t:'call / pushq', a:'−8', b:'valB', f:'加法', m:'valE ← valB + (−8)（新栈顶）'},
+  {t:'ret / popq',   a:'+8', b:'valB', f:'加法', m:'valE ← valB + 8（弹栈后的栈顶）'},
+  {t:'jXX / halt / nop', a:'0', b:'0', f:'加法', m:'不需要 ALU（jXX 只算 Cnd）'}
+];
+const MEMTAB = [
+  {t:'mrmovq D(rB), rA', rd:1, wr:0, addr:'valE', data:'—', m:'valM ← M₈[valE]'},
+  {t:'rmmovq rA, D(rB)', rd:0, wr:1, addr:'valE', data:'valA', m:'M₈[valE] ← valA'},
+  {t:'pushq rA',  rd:0, wr:1, addr:'valE（=valB−8）', data:'valA', m:'M₈[valE] ← valA（数据入栈）'},
+  {t:'popq rA',   rd:1, wr:0, addr:'valA（=旧栈顶）', data:'—', m:'valM ← M₈[valA]'},
+  {t:'call Dest', rd:0, wr:1, addr:'valE（=%rsp−8）', data:'valP', m:'M₈[valE] ← valP（返回地址入栈）'},
+  {t:'ret',       rd:1, wr:0, addr:'valA（=旧栈顶）', data:'—', m:'valM ← M₈[valA]（弹出返回地址）'},
+  {t:'其余指令',   rd:0, wr:0, addr:'—', data:'—', m:'访存空过（mem_read=mem_write=0）'}
+];
+
+/* ---- ⑦ 流水线场景与逐周期引擎（源自课件 4.4） ---- */
+const PP_RESETS = [
+ {id:'basic', name:'基准：五连 irmovq（无冒险）', fwdLock:false,
+  note:'观察点：无依赖时每个周期都有一条新指令进入 F、一条旧指令离开 W——稳态 CPI=1。前 4 个周期是"填充"、后 4 个是"排空"，它们摊薄了短程序的 CPI；程序越长越接近 1。',
+  prog:[
+   {asm:'irmovq $1, %rax', dstE:'rax', succ:1},
+   {asm:'irmovq $2, %rcx', dstE:'rcx', succ:2},
+   {asm:'irmovq $3, %rdx', dstE:'rdx', succ:3},
+   {asm:'irmovq $4, %rbx', dstE:'rbx', succ:4},
+   {asm:'halt', halt:true}
+  ]},
+ {id:'h0', name:'数据冒险：转发救场', fwdLock:false,
+  note:'观察点：addq 在 D 阶段要读 %rdx 和 %rax，两个生产者分别还卡在 M、E 阶段——根本没写回！打开转发：valA←M_valE、valB←e_valE，零等待。再关掉转发：addq 只能原地停 2 拍，等生产者走到 W 由寄存器堆"同拍写读"喂给它。',
+  prog:[
+   {asm:'irmovq $10, %rdx', dstE:'rdx', succ:1},
+   {asm:'irmovq $3, %rax', dstE:'rax', succ:2},
+   {asm:'addq %rdx, %rax', srcA:'rdx', srcB:'rax', dstE:'rax', succ:3},
+   {asm:'halt', halt:true}
+  ]},
+ {id:'prio', name:'转发优先级：E > M > W', fwdLock:true,
+  note:'观察点：三条 irmovq 都写 %rax。rrmovq 在 D 时，E/M/W 三个阶段各躺着一个 %rax 的候选值——必须拿"最新的"（E 阶段的 3），程序串行语义才对。硬件上就是 d_valA 多路选择器里 e_valE 排最前（同一阶段内 dstM 又优先于 dstE，照顾 popq %rsp 的语义）。',
+  prog:[
+   {asm:'irmovq $1, %rax', dstE:'rax', succ:1},
+   {asm:'irmovq $2, %rax', dstE:'rax', succ:2},
+   {asm:'irmovq $3, %rax', dstE:'rax', succ:3},
+   {asm:'rrmovq %rax, %rdx', srcA:'rax', dstE:'rdx', succ:4},
+   {asm:'halt', halt:true}
+  ]},
+ {id:'luh', name:'加载/使用冒险：必须停顿', fwdLock:true,
+  note:'观察点：mrmovq 的 %rax 要到 M 阶段末才从内存读出，紧随其后的 addq 在 D 阶段末就要用——转发也来不及（差一拍）。控制逻辑：F、D 暂停一拍 + 向 E 注入气泡；下一拍生产者到 M，m_valM 转发成功。这是带转发的 PIPE 里唯一必须停顿的数据冒险。',
+  prog:[
+   {asm:'irmovq $128, %rdx', dstE:'rdx', succ:1},
+   {asm:'irmovq $3, %rcx', dstE:'rcx', succ:2},
+   {asm:'rmmovq %rcx, 0(%rdx)', srcA:'rcx', srcB:'rdx', succ:3},
+   {asm:'irmovq $10, %rbx', dstE:'rbx', succ:4},
+   {asm:'mrmovq 0(%rdx), %rax', srcB:'rdx', dstM:'rax', succ:5},
+   {asm:'addq %rbx, %rax', srcA:'rbx', srcB:'rax', dstE:'rax', succ:6},
+   {asm:'halt', halt:true}
+  ]},
+ {id:'misp', name:'分支预测错误：冲刷 2 条', fwdLock:true,
+  note:'观察点：PIPE 取指时就预测"跳转发生"（jXX/call 都取 valC 当下一条）。xorq 把 ZF 置 1，jne 实际不跳（Cnd=0）——E 阶段发现预测错了，下一周期向 D、E 注入气泡，冲掉错误路径上的 2 条指令，从 valP（fall-through）重新取指。代价：2 个周期。',
+  prog:[
+   {asm:'xorq %rax, %rax  # ZF←1', srcA:'rax', srcB:'rax', dstE:'rax', succ:1},
+   {asm:'jne t  # 实际不跳', isJXX:true, cnd:0, tgt:2, fall:4, succ:2},
+   {asm:'t: irmovq $3, %rdx（错误路径）', dstE:'rdx', succ:3},
+   {asm:'irmovq $4, %rcx（错误路径）', dstE:'rcx', succ:4},
+   {asm:'irmovq $1, %rax  # 正确路径', dstE:'rax', succ:5},
+   {asm:'halt', halt:true}
+  ]},
+ {id:'retb', name:'ret：等返回地址 3 拍', fwdLock:true,
+  note:'观察点：ret 的返回地址 valM 要到 W 阶段才可用，而 F 早已按顺序预测取指。处理：ret 途经 D/E/M 的三个周期里 F 暂停（冻结在 ret 的顺序后继上）、D 注入气泡；等 ret 到 W 拿到 valM，把冻结的错误指令冲掉，从返回地址重新取指。',
+  prog:[
+   {asm:'irmovq Stack, %rsp', dstE:'rsp', succ:1},
+   {asm:'call p', srcB:'rsp', dstE:'rsp', isCall:true, tgt:3, succ:2},
+   {asm:'irmovq $5, %rsi  # 返回点', dstE:'rsi', succ:6},
+   {asm:'p: irmovq $-1, %rdi', dstE:'rdi', succ:4},
+   {asm:'ret', srcA:'rsp', srcB:'rsp', dstE:'rsp', isRet:true, retTo:2, succ:5},
+   {asm:'irmovq $1, %rax（不该执行）', dstE:'rax', succ:6},
+   {asm:'halt', halt:true}
+  ]}
+];
+
+function runPipe(prog, fwdOn){
+  const rows = []; let rowSeq = 0;
+  const newRow = function(node, bub){
+    const r = {id:rowSeq++, node:node || null, bub:!!bub, squashAt:null, doneCycle:null};
+    rows.push(r); return r;
+  };
+  let pc = 0, halted = false;
+  let st = {F:null, D:null, E:null, M:null, W:null};
+  const cycles = [];
+  function fetchAt(){
+    if (pc === null || pc === undefined || halted) return null;
+    const node = prog[pc];
+    if (!node) return null;
+    const row = newRow(node, false);
+    if (node.isJXX || node.isCall){ pc = node.tgt; }
+    else if (node.halt){ halted = true; pc = null; }
+    else { pc = (node.succ !== undefined) ? node.succ : pc + 1; }
+    return {row:row, node:node};
+  }
+  st.F = fetchAt();
+  let lastActive = 0;
+  for (let t = 1; t <= 40; t++){
+    const ev = [];
+    const dNode = st.D && !st.D.row.bub ? st.D.node : null;
+    const eNode = st.E && !st.E.row.bub ? st.E.node : null;
+    const mNode = st.M && !st.M.row.bub ? st.M.node : null;
+    const wNode = st.W && !st.W.row.bub ? st.W.node : null;
+    let naiveWait = false;
+    if (dNode){
+      [['srcA','valA'],['srcB','valB']].forEach(function(pr){
+        const reg = dNode[pr[0]]; if (!reg) return;
+        if (eNode && eNode.dstE && eNode.dstE === reg){
+          if (fwdOn) ev.push({k:'fwd', to:pr[1], from:'e_valE', reg:reg, prod:st.E.row.id, cons:st.D.row.id});
+          else naiveWait = true;
+        } else if (mNode && mNode.dstM && mNode.dstM === reg){
+          if (fwdOn) ev.push({k:'fwd', to:pr[1], from:'m_valM', reg:reg, prod:st.M.row.id, cons:st.D.row.id});
+          else naiveWait = true;
+        } else if (mNode && mNode.dstE && mNode.dstE === reg){
+          if (fwdOn) ev.push({k:'fwd', to:pr[1], from:'M_valE', reg:reg, prod:st.M.row.id, cons:st.D.row.id});
+          else naiveWait = true;
+        } else if (wNode && wNode.dstM && wNode.dstM === reg){
+          ev.push({k:'fwd', to:pr[1], from:'W_valM', reg:reg, prod:st.W.row.id, cons:st.D.row.id, rf:true});
+        } else if (wNode && wNode.dstE && wNode.dstE === reg){
+          ev.push({k:'fwd', to:pr[1], from:'W_valE', reg:reg, prod:st.W.row.id, cons:st.D.row.id, rf:true});
+        }
+      });
+    }
+    const loadUse = fwdOn && !!(eNode && eNode.dstM && dNode &&
+        (eNode.dstM === dNode.srcA || eNode.dstM === dNode.srcB));
+    const retIn = !!((dNode && dNode.isRet) || (eNode && eNode.isRet) || (mNode && mNode.isRet));
+    const mispred = !!(eNode && eNode.isJXX && eNode.cnd === 0);
+    const F_stall = loadUse || naiveWait || retIn;
+    const D_stall = loadUse || naiveWait;
+    const D_bubble = mispred || (retIn && !D_stall);
+    const E_bubble = mispred || loadUse;
+    if (st.W && !st.W.row.bub) st.W.row.doneCycle = t;
+    cycles.push({t:t,
+      st:{F:st.F?st.F.row:null, D:st.D?st.D.row:null, E:st.E?st.E.row:null,
+          M:st.M?st.M.row:null, W:st.W?st.W.row:null},
+      ev:ev, loadUse:loadUse, retIn:retIn, mispred:mispred,
+      F_stall:F_stall, D_stall:D_stall, D_bubble:D_bubble, E_bubble:E_bubble});
+    const nW = st.M, nM = st.E;
+    let nE, nD, nF;
+    if (E_bubble || D_stall){ nE = {row:newRow(null, true), node:null}; }
+    else { nE = st.D; }
+    if (D_bubble){ nD = {row:newRow(null, true), node:null}; }
+    else if (D_stall){ nD = st.D; }
+    else { nD = st.F; }
+    if (mispred){
+      if (st.D && !st.D.row.bub){ st.D.row.squashAt = t; ev.push({k:'squash', where:'D'}); }
+      if (st.F && !st.F.row.bub){ st.F.row.squashAt = t; ev.push({k:'squash', where:'F'}); }
+      ev.push({k:'mispred'});
+      pc = eNode.fall;
+    }
+    let retUnstall = false;
+    if (F_stall){ nF = st.F; }
+    else {
+      if (st.W && st.W.node && st.W.node.isRet){
+        retUnstall = true;
+        pc = st.W.node.retTo;
+        if (st.F && !st.F.row.bub){ st.F.row.squashAt = t; ev.push({k:'squash', where:'F（冻结的错误取指）'}); }
+        ev.push({k:'retgo'});
+      }
+      nF = fetchAt();
+      if (retUnstall) nD = nF;   /* 冻结指令被覆盖：D 装入的是新取的返回目标 */
+    }
+    st = {F:nF, D:nD, E:nE, M:nM, W:nW};
+    if (st.F || st.D || st.E || st.M || st.W) lastActive = t + 1;
+    else break;
+  }
+  const realRows = rows.filter(function(r){ return !r.bub && r.node && !r.node.halt && r.squashAt === null; });
+  const retired = realRows.filter(function(r){ return r.doneCycle !== null; }).length;
+  const bubCount = rows.filter(function(r){ return r.bub; }).length;
+  const total = Math.max(cycles.length, lastActive);
+  return {rows:rows, cycles:cycles, retired:retired, total:total, bubbles:bubCount};
+}
+
+/* ---- ⑧ 测验数据 ---- */
+const QUIZ = [
+ {q:'任何一条 Y86-64 指令都"从不空过"的阶段是哪两个？',
+  o:['译码和执行','取指和更新 PC','访存和写回','六个阶段全都不空'], a:1,
+  e:'halt / nop 连译码都没事干，但只要处理器还想"取下一条"，取指（F）和更新 PC（P）就必须工作。'},
+ {q:'valP（顺序后继地址）在哪个阶段算出来？',
+  o:['译码 D','执行 E','取指 F','更新 PC P'], a:2,
+  e:'取指阶段按指令长度顺手算好 valP = PC + 长度，之后随身携带；call 还会在访存阶段把它当返回地址压栈。'},
+ {q:'irmovq $0x20, %rbx 在译码阶段做什么？',
+  o:['valA ← R[%rax]','valB ← R[%rbx]','什么都不做','读条件码'], a:2,
+  e:'立即数已经躺在 valC 里，不需要读寄存器——irmovq 的译码阶段整个空过。'},
+ {q:'mrmovq 8(%rbx), %rcx 中执行阶段算出的 valE 是什么？',
+  o:['valB−valC 的算术结果','内存地址 valB+valC','要装进 %rcx 的最终数据','条件判断结果 Cnd'], a:1,
+  e:'ALU 在这里做的是地址加法 valE = valB+valC；访存阶段用它当地址去读，读到的才是 valM。'},
+ {q:'call 压入栈里的返回地址来自哪个信号？',
+  o:['valC','valM','valE','valP'], a:3,
+  e:'valP 在取指阶段就算好了（PC+9）；执行阶段算新栈顶 valE = valB−8，访存阶段 M₈[valE] ← valP。'},
+ {q:'ret 执行完后，新 PC 来自哪个信号？',
+  o:['valP','valC','valM','valE'], a:2,
+  e:'ret 从栈弹出返回地址，这个值到访存阶段才读到（valM），所以 PC ← valM——所有新 PC 来源里唯一来自内存的。'},
+ {q:'popq %rdx 的写回阶段写了哪两个寄存器？',
+  o:['%rsp 和 %rdx','%rdx 和 %rbx','只写 %rdx','只写 %rsp'], a:0,
+  e:'dstE=%rsp ← valE（新栈顶），dstM=%rdx ← valM（弹出的数据）。popq 是唯一一拍写两个寄存器的指令。'},
+ {q:'条件码 ZF/SF/OF 只会被哪类指令修改？',
+  o:['OPq、jXX、cmovXX 都会','只有 OPq','OPq 和 call','任何指令都会'], a:1,
+  e:'jXX / cmovXX 只是"读"条件码来算 Cnd，从不写它。只有 OPq 在执行阶段按 ALU 结果置 ZF/SF/OF。'},
+ {q:'jXX Dest 的新 PC 表达式是？',
+  o:['PC ← valC','PC ← valP','PC ← Cnd ? valC : valP','PC ← valM'], a:2,
+  e:'条件成立跳到 valC（Dest），不成立顺序走 valP；jmp 的 Cnd 恒为 1，退化为 PC ← valC。'},
+ {q:'cmovXX 条件不满足（Cnd=0）时，被"跳过"的操作发生在哪个阶段？',
+  o:['执行（不算 valE）','访存（不读写内存）','写回（不写寄存器）','更新 PC'], a:2,
+  e:'valE 照算（0+valA），但写端口被 Cnd 挡住——cmov 的"条件"最终落在 W 阶段的写使能上。'},
+ {q:'pushq %rax 执行阶段算 valE = valB − 8，这里的 valB 读的是哪个寄存器？',
+  o:['rB 字段指定的寄存器','%rax','PC','%rsp'], a:3,
+  e:'pushq 的寄存器字节里 rB=F，硬件固定选 %rsp（srcB=RRSP）：valB=R[%rsp]，valE 既是新栈顶也是写内存的地址。'},
+ {q:'rmmovq %rax, 0(%rbx) 在访存阶段写入内存的数据来自哪个信号？',
+  o:['valE','valC','valA','valM'], a:2,
+  e:'valA=R[%rax] 是被存的数据；valE 只是执行阶段算出的地址（valB+valC）。写操作是 M₈[valE] ← valA。'},
+ {q:'mrmovq 8(%rbx), %rcx 在译码阶段为什么不读 rA？',
+  o:['rA 字段被编码为 F','读端口 A 本周期被 %rsp 占用','rA 是写回目标，译码阶段用不到它的值','rA 的值已经包含在 valC 里'], a:2,
+  e:'mrmovq 里 rA 扮演 dstM（写目标），要到 W 阶段才用。控制逻辑直接令 srcA=RNONE 跳过读——这就是该指令没有 valA 的原因。'},
+ {q:'subq %rax, %rbx，执行前 %rax=100、%rbx=50。执行后 %rbx = ？',
+  o:['50','−50','150','100'], a:1,
+  e:'valE = valB − valA = 50 − 100 = −50。Y86-64 的 OPq 永远是 valB ⊕ valA（B 在前），别按 x86 汇编直觉算成 100−50。'},
+ {q:'SEQ 的时钟周期为什么必须足够长？',
+  o:['为了省电','条件码需要两个周期才能稳定','PC 更新必须在时钟中点完成','必须容纳最慢指令的全部六个阶段（含访存）'], a:3,
+  e:'SEQ 每个周期完整走完一条指令，时钟要等最慢的组合路径（通常含数据内存访问）结束才能触发状态写入——这正是 4.4 节引入流水线的动机。'},
+ {q:'halt 的 Stat=HLT 是在哪个阶段设置的？',
+  o:['执行','访存','取指','写回'], a:2,
+  e:'halt 在取指阶段就置 HLT；同类状态：非法指令（INS）也在取指检测，而地址错误（ADR）要到访存阶段才能发现。'},
+ {q:'rrmovq 为什么让 ALU 算 "0 + valA"，而不直接把 valA 送去写回？',
+  o:['为了顺便更新条件码','SEQ 写回端口的数据来源固定为 valE（ALU 输出）或 valM，没有绕过 ALU 的旁路','ALU 必须每周期都工作否则会损坏','这是流水线版本的要求'], a:1,
+  e:'SEQ 复用一条数据通路：送进 dstE 写端口的值全部来自 ALU 输出 valE。与其为 rrmovq 加一条专用旁路，不如复用加法器做 0+valA，硬件更省。'},
+ {q:'call 与 jXX 都携带 8 字节目标地址 valC，二者 PC 更新的差别是？',
+  o:['没有差别，都是 PC←valC','call 按 Cnd 选，jXX 无条件 PC←valC','jXX 按 Cnd 选 valC 或 valP，call 无条件 PC←valC','call 的 PC←valP，jXX 的 PC←valC'], a:2,
+  e:'jXX：PC ← Cnd ? valC : valP（赌错了走 valP）；call：无条件 PC←valC，但代价是先在访存阶段压入返回地址 valP、写回阶段改 %rsp。'},
+ {q:'pushq 和 popq 访问内存用的地址分别是？',
+  o:['都用 valE','都用 valA','pushq 写 M₈[valA]，popq 读 M₈[valE]','pushq 写 M₈[valE]，popq 读 M₈[valA]（旧栈顶）'], a:3,
+  e:'pushq 的写入地址是新栈顶 valE=valB−8；popq 读的是旧栈顶 valA=R[%rsp]——而 valE=valB+8 是新栈顶，只用于写回阶段更新 %rsp。'},
+ {q:'andq / xorq 执行后，条件码如何变化？',
+  o:['ZF/SF 按结果更新，OF 恒为 0','完全不更新','只有 ZF 更新','ZF/SF/OF 都按加法规则更新'], a:0,
+  e:'OPq 四种运算都会置 ZF/SF（set_cc 对整个 OPq 成立），但逻辑运算不可能溢出，ALU 的 OF 输出恒为 0。易错点：别以为只有 addq/subq 才动条件码。'},
+ {q:'（流水线）300ps 组合逻辑 + 20ps 寄存器的未流水系统，时钟周期与吞吐量是？',
+  o:['300ps、3.33 GIPS','320ps、3.12 GIPS','300ps、3.12 GIPS','320ps、3.33 GIPS'], a:1,
+  e:'时钟必须容纳"逻辑+写寄存器"=320ps；吞吐=1000/320≈3.12 GIPS（1s=10¹²ps，GIPS=10⁹条/秒）。'},
+ {q:'把 300ps 逻辑均分为 3 段（各 100ps）流水化后，时钟周期与单条指令总延迟变为？',
+  o:['100ps、300ps','120ps、320ps','120ps、360ps','100ps、360ps'], a:2,
+  e:'时钟=段延迟+寄存器=100+20=120ps；总延迟=3×120=360ps。注意：延迟比未流水的 320ps 反而更长——流水线买的是吞吐（8.33 GIPS，加速 2.67 倍），不是延迟。'},
+ {q:'关于流水线对延迟和吞吐的影响，正确说法是？',
+  o:['两者都大幅改善','延迟不变，吞吐提升','吞吐提升，延迟甚至可能略增','延迟大减，吞吐不变'], a:2,
+  e:'k 段流水引入 k 个寄存器开销，总延迟 = L + k·r ≥ 原来的 L + r。流水线重叠执行提高的是吞吐量；"流水线减少单条指令延迟"是经典错觉。'},
+ {q:'为什么必须在流水线阶段之间加寄存器？',
+  o:['为了保存 PC','为了省电','因为相邻阶段并行执行不同指令，后一阶段要用前一阶段上一周期的中间结果，必须先锁存','为了降低单条指令的延迟'], a:2,
+  e:'流水化后 A、B 两段同周期处理的是两条不同指令：B 需要的值是上一周期 A 产生的，不存进阶段寄存器就丢了。'},
+ {q:'PIPE 中信号命名 E_icode 与 e_valE 的区别是？',
+  o:['大小写随意，等价','大写前缀=从流水线寄存器 E 读入的信号；小写前缀=Execute 阶段刚产生的输出','小写是控制信号，大写是数据信号','大写属于 SEQ，小写属于 PIPE'], a:1,
+  e:'命名规则：进入某阶段的信号加该阶段流水线寄存器前缀（大写），如 D_icode/E_icode/M_icode；某阶段自己产生的信号加小写前缀，如 e_valE、m_valM。'},
+ {q:'SEQ+ 相比 SEQ 的关键变换是？',
+  o:['删掉了寄存器堆','把更新 PC 移到取指阶段（算出的是下一条指令的预测地址 predPC），PC 不再是硬件寄存器但程序员不可见','把 ALU 拆成两个','把访存阶段提前'], a:1,
+  e:'SEQ+ 在取指时就算新 PC（预测地址）。这说明 ISA 与实现不必一一对应——程序员可见的"PC"可以由若干内部寄存器（pIcode、pValM 等）等效实现。'},
+ {q:'PIPE 取指阶段如何预测下一条 PC？',
+  o:['一律用 valP','jXX/call 预测取 valC（预测跳转发生），其余指令用 valP','一律用 valC','随机选择'], a:1,
+  e:'预测规则：icode 是 jXX 或 call → 取 valC（目标地址），否则取 valP。jmp 与 call 永远预测正确；条件跳转猜错就由冲刷机制补救。'},
+ {q:'三条连续指令都写 %rax，随后的指令读 %rax，转发应选哪个阶段的值？',
+  o:['W（最晚产生）','M','E（最早的阶段=最新的指令）','随便，结果一样'], a:2,
+  e:'d_valA 多路选择器按 e_valE → m_valM → M_valE → W_valM → W_valE 排序：越靠前的阶段对应越"新"的指令，取它才匹配程序串行语义。'},
+ {q:'加载/使用（load/use）冒险为什么转发解决不了？',
+  o:['转发路径带宽不够','m_valM 在 M 阶段末才从内存读出，而使用者在 D 阶段末就需要，差了一拍','因为会破坏条件码','因为 mrmovq 不产生 valE'], a:1,
+  e:'ALU 结果（e_valE）在 E 阶段产生，距离 D 只差一拍，转发来得及；load 的结果 M 阶段末才有，距离 D 差两拍——必须停顿 1 周期，下一拍再由 m_valM 转发。'},
+ {q:'检测到 load/use 冒险时，流水线控制逻辑的动作是？',
+  o:['F、D 暂停 + E 注入气泡','F、D、E 全部暂停','只冲刷 E','W 暂停'], a:0,
+  e:'指令卡在 F/D（寄存器保持不变），E 注入一个气泡占位。检测条件：E_icode∈{mrmovq,popq} 且 E_dstM 命中 d_srcA/d_srcB。注意最后一拍必须补气泡，否则指令会被执行两次。'},
+ {q:'分支预测错误的检测条件与代价是？',
+  o:['E_icode=jXX 且 e_Cnd=0；代价 2 周期（D、E 注气泡）','M_icode=jXX 且 Cnd=0；代价 1 周期','F 阶段发现；代价 3 周期','无代价'], a:0,
+  e:'跳不跳在 E 阶段见分晓。猜错时下周期向 D、E 注气泡冲掉错误路径上的 2 条指令，并从 valP 重新取指——总代价 2 个周期。'},
+ {q:'ret 指令在 PIPE 中的处理是？',
+  o:['预测返回地址，零代价','F 暂停 + D 注气泡，持续 3 个周期，等 valM 到 W 才从返回地址取指','同分支预测，冲 2 条','ret 不进流水线'], a:1,
+  e:'返回地址 valM 在 W 阶段才可用。ret 途经 D/E/M 期间 F 冻结、D 注气泡（检测条件：IRET∈{D_icode,E_icode,M_icode}）；到 W 后冲掉冻结的错误取指，从 valM 重新取指。'},
+ {q:'流水线寄存器的 stall 与 bubble 模式区别是？',
+  o:['没有区别','stall=寄存器保持输出不变（指令原地踏步）；bubble=向下游注入一个"nop"（控制信号清零）','stall 用于数据冒险，bubble 用于结构冒险','bubble 保持不变，stall 清零'], a:1,
+  e:'stall：输入禁写，输出保持——指令停在原阶段；bubble：输出被置成空操作——下游收到的是"什么都不做"。两者同时为 1 是不允许的。'},
+ {q:'（练习 4.29）把 300ps 逻辑划成 k 段、寄存器 20ps，当 k→∞，吞吐量趋于？',
+  o:['无穷大','100 GIPS','50 GIPS（=1000/20，寄存器延迟成为瓶颈）','3.12 GIPS'], a:2,
+  e:'吞吐 = 1000/(300/k + 20)，k→∞ 时 → 1000/20 = 50 GIPS；而延迟 = 300 + 20k → ∞。深流水的收益会下降，寄存器延迟是天花板。'},
+ {q:'call / pushq 把栈指针减 8，硬件上是怎么算的？',
+  o:['专设一个减法器','把 −8 当作 ALU 的 A 输入，ALU 恒做加法：valE = valB + (−8)','先算 valB+8 再取反','在写回阶段减'], a:1,
+  e:'看 HCL：aluA 在 call/pushq 时选 −8、ret/popq 时选 +8，aluB 选 valB，alufun 恒为加法——所有指令的 valE 都是"valB + aluA"这一条统一公式。'},
+ {q:'popq %rsp 时 dstE 与 dstM 都是 %rsp，最终 %rsp 的值是？',
+  o:['valE（新栈顶 rsp+8）','valM（从内存弹出的值）','不确定，硬件竞态','两个都写，后写胜出'], a:1,
+  e:'按程序顺序语义，popq %rsp 应把栈顶内容装进 %rsp，所以 valM（内存值）优先。这也是 d_valA 选择器里"同阶段 dstM 排在 dstE 前"的原因。'}
+];
+
+/* ================================================================
+ * Part B：DOM 渲染与交互（仅在浏览器执行）
+ * ================================================================ */
+function boot(){
+  const $ = function(id){ return document.getElementById(id); };
+  const esc = function(s){ return String(s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
+  const cssVar = function(k){ return 'var(' + SCOL[k] + ')'; };
+
+  /* ---------- ① 六阶段卡片 ---------- */
+  const stgByK = {};
+  STAGES.forEach(function(s){ stgByK[s.k] = s; });
+  function renderFlow(activeK){
+    const box = $('flowstrip');
+    box.innerHTML = STAGES.map(function(s, i){
+      return '<button class="stg' + (s.k===activeK?' act':'') + '" data-k="' + s.k + '" style="--sc:' + cssVar(s.k) + '">' +
+        '<div class="lt">' + s.k + '</div><div class="nm">' + s.n + '</div>' +
+        '<div class="en">' + s.en + '</div><div class="hw">' + s.hw + '</div></button>' +
+        (i < 5 ? '' : '');
+    }).join('');
+    Array.prototype.forEach.call(box.querySelectorAll('.stg'), function(btn){
+      btn.addEventListener('click', function(){ renderFlow(btn.getAttribute('data-k')); renderStgDetail(btn.getAttribute('data-k')); });
+    });
+  }
+  function renderStgDetail(k){
+    const s = stgByK[k];
+    $('stgdetail').innerHTML =
+      '<h3 style="color:' + cssVar(k) + ';margin-top:0">' + s.k + ' · ' + s.n + '（' + s.en + '）</h3>' +
+      '<p style="margin:4px 0 10px;font-size:15px">' + s.motto + '　<span style="color:var(--muted);font-size:13px">硬件：' + s.hw + '</span></p>' +
+      '<div class="kv">' +
+      '<dt>职责</dt><dd>' + s.job + '</dd>' +
+      '<dt>输入信号</dt><dd><span class="chiprow">' + s.inp.map(function(x){return '<span class="schip">'+esc(x)+'</span>';}).join('') + '</span></dd>' +
+      '<dt>输出信号</dt><dd><span class="chiprow">' + s.out.map(function(x){return '<span class="schip fill">'+esc(x)+'</span>';}).join('') + '</span></dd>' +
+      '<dt>状态写入</dt><dd>' + s.state + '</dd>' +
+      '<dt>易错点</dt><dd style="color:var(--warn)">' + s.pitfall + '</dd>' +
+      '</div>';
+  }
+  renderFlow('F'); renderStgDetail('F');
+
+  /* ---------- ② 信号字典 ---------- */
+  function renderSig(activeN){
+    const grid = $('siggrid');
+    grid.innerHTML = SIGS.map(function(g){
+      return '<button class="sigbtn' + (g.n===activeN?' act':'') + '" data-n="' + g.n + '">' +
+        '<div class="sn">' + g.n + '</div><div class="sc2">' + g.cn + '</div>' +
+        '<div class="from" style="color:var(--brand)">' + g.from + '</div></button>';
+    }).join('');
+    Array.prototype.forEach.call(grid.querySelectorAll('.sigbtn'), function(btn){
+      btn.addEventListener('click', function(){ renderSig(btn.getAttribute('data-n')); });
+    });
+    const g = SIGS.filter(function(x){ return x.n === activeN; })[0] || SIGS[0];
+    const dots = STG_ORDER.map(function(k){
+      const r = g.roles[k];
+      const map = {p:'●', u:'○', c:'◐', b:'●○'};
+      const col = {p:'var(--brand)', u:'var(--cM)', c:'var(--muted)', b:'var(--cE)'};
+      return '<span class="schip" style="color:' + col[r] + ';border-color:currentColor">' +
+        '<b>' + k + '</b>&nbsp;' + map[r] + '</span>';
+    }).join(' ');
+    $('sigdetail').innerHTML =
+      '<h3 style="margin-top:2px"><span style="font-family:Consolas,monospace;color:var(--brand)">' + g.n + '</span>　' + g.cn +
+      '　<span style="font-size:13px;color:var(--muted);font-weight:400">来源：' + g.from + '</span></h3>' +
+      '<div class="kv" style="margin-top:6px">' +
+      '<dt>是什么</dt><dd>' + g.def + '</dd>' +
+      '<dt>举个例子</dt><dd style="font-family:Consolas,monospace;font-size:13px">' + g.ex + '</dd>' +
+      '<dt>与六阶段<br>的关系</dt><dd>' + g.rel + '</dd>' +
+      '<dt>生命周期</dt><dd><span class="chiprow">' + dots + '</span><div class="lg">● 产生　○ 使用　◐ 控制引用</div></dd>' +
+      '</div>';
+  }
+  renderSig('valE');
+
+  (function(){
+    let h = '<tr><th class="sn">信号 \\ 阶段</th>' + STG_ORDER.map(function(k){
+      const s = stgByK[k]; return '<th>' + k + ' ' + s.n + '</th>'; }).join('') + '</tr>';
+    SIGS.forEach(function(g){
+      h += '<tr><td class="sn">' + g.n + '</td>' + STG_ORDER.map(function(k){
+        const r = g.roles[k];
+        if (!r) return '<td>·</td>';
+        if (r === 'p') return '<td class="dp">●</td>';
+        if (r === 'u') return '<td class="du">○</td>';
+        if (r === 'b') return '<td class="db">●○</td>';
+        return '<td class="dc">◐</td>';
+      }).join('') + '</tr>';
+    });
+    $('sigmx').innerHTML = h;
+  })();
+
+  /* ---------- ③ 模拟器 ---------- */
+  let simIns = Object.assign({}, DEFINS.OPq);
+  let simData = null, simIdx = 0, autoTimer = null;
+  const TYPE_NAMES = { halt:'halt 停机', nop:'nop 空操作', rrmovq:'rrmovq 传送', cmovXX:'cmovXX 条件传送',
+    irmovq:'irmovq 立即数装入', rmmovq:'rmmovq 写内存', mrmovq:'mrmovq 读内存', OPq:'OPq 算术逻辑',
+    jXX:'jXX 跳转', call:'call 调用', ret:'ret 返回', pushq:'pushq 压栈', popq:'popq 出栈' };
+  const FN_LISTS = {
+    OPq:['addq','subq','andq','xorq'],
+    cmovXX:['cmovle','cmovl','cmove','cmovne','cmovge','cmovg'],
+    jXX:['jmp','jle','jl','je','jne','jge','jg']
+  };
+  const VC_LABEL = { irmovq:'valC（立即数 V）', rmmovq:'valC（位移 D）', mrmovq:'valC（位移 D）', jXX:'valC（目标 Dest）', call:'valC（目标 Dest）' };
+
+  function stageZh(k){ return stgByK[k].n; }
+  function curStageK(){ return simIdx > 0 && simIdx <= 6 ? simData.steps[simIdx-1].k : null; }
+
+  function renderCtl(){
+    $('selType').innerHTML = ORDER.map(function(t){
+      return '<option value="' + t + '"' + (t===simIns.type?' selected':'') + '>' + TYPE_NAMES[t] + '</option>';
+    }).join('');
+    /* 变体 */
+    if (FN_LISTS[simIns.type]){
+      $('ctlFn').style.display = '';
+      const off = simIns.type === 'cmovXX' || simIns.type === 'jXX' ? 1 : 0;
+      $('selFn').innerHTML = FN_LISTS[simIns.type].map(function(nm, i){
+        return '<option value="' + (i+off) + '"' + ((i+off)===(simIns.fn||0)?' selected':'') + '>' + nm + '</option>';
+      }).join('');
+    } else { $('ctlFn').style.display = 'none'; }
+    /* rA */
+    const needRA = ['rrmovq','cmovXX','rmmovq','mrmovq','OPq','pushq','popq'].indexOf(simIns.type) >= 0;
+    $('ctlRA').style.display = needRA ? '' : 'none';
+    if (needRA) $('selRA').innerHTML = R8.map(function(r){
+      return '<option value="' + r + '"' + (r===simIns.rA?' selected':'') + '>%' + r + '</option>'; }).join('');
+    /* rB */
+    const needRB = ['rrmovq','cmovXX','irmovq','rmmovq','mrmovq','OPq'].indexOf(simIns.type) >= 0;
+    $('ctlRB').style.display = needRB ? '' : 'none';
+    if (needRB) $('selRB').innerHTML = R8.map(function(r){
+      return '<option value="' + r + '"' + (r===simIns.rB?' selected':'') + '>%' + r + '</option>'; }).join('');
+    /* valC */
+    if (VC_LABEL[simIns.type]){
+      $('ctlVC').style.display = '';
+      $('lblVC').textContent = VC_LABEL[simIns.type];
+      $('inVC').value = fmtV(b64(simIns.valC));
+    } else { $('ctlVC').style.display = 'none'; }
+  }
+
+  function loadSim(keepIdx){
+    simData = execStages(simIns, baseState(simIns));
+    simIdx = keepIdx ? Math.min(simIdx, 6) : 0;
+    renderCtl(); renderAll();
+  }
+
+  function renderAll(){
+    renderStatePanels();
+    renderStepper();
+    renderDiagram();
+    renderStagePanel();
+    $('btnPrev').disabled = simIdx === 0;
+    const nxt = simIdx < 6 ? '下一步：' + STG_ORDER[simIdx] + ' ' + stageZh(STG_ORDER[simIdx]) + ' ▶' : '已完成 ✔';
+    $('btnNext').disabled = simIdx >= 6;
+    $('btnNext').textContent = nxt;
+  }
+
+  /* 状态面板（PC/CC/寄存器/指令内存/数据内存） */
+  function renderStatePanels(){
+    const snapS = simData.snaps[simIdx];
+    const prev = simIdx > 0 ? simData.snaps[simIdx-1] : null;
+    const d = prev ? diff(prev, snapS) : null;
+    /* PC */
+    $('pcval').textContent = fmtAddr(snapS.pc);
+    const stEl = $('statchip');
+    stEl.textContent = snapS.stat;
+    stEl.className = 'statchip ' + (snapS.stat === 'HLT' ? 'hlt' : 'aok');
+    $('pcnote').textContent = d && d.pc
+      ? '本阶段更新：' + fmtAddr(prev.pc) + ' → ' + fmtAddr(snapS.pc)
+      : (simIdx === 0 ? '顺序起点，待取指' : '本阶段 PC 未变（时钟沿才更新）');
+    if (d && d.pc) $('pcval').classList.add('flashb'); else $('pcval').classList.remove('flashb');
+    /* CC */
+    const ccrow = $('ccrow');
+    if (!ccrow.hasChildNodes()){
+      ['ZF','SF','OF'].forEach(function(c){
+        const b = document.createElement('button');
+        b.className = 'ccbtn'; b.textContent = c; b.id = 'cc-' + c;
+        b.addEventListener('click', function(){
+          CC_INIT[c] = CC_INIT[c] ? 0 : 1;
+          loadSim(false);
+        });
+        ccrow.appendChild(b);
+      });
+    }
+    const ccRewrite = (curStageK() === 'E' && simIns.type === 'OPq');
+    ['ZF','SF','OF'].forEach(function(c){
+      const b = $('cc-' + c);
+      b.className = 'ccbtn' + (CC_INIT[c] ? ' on1' : '');
+      if (ccRewrite || (d && d.cc.indexOf(c) >= 0)) b.classList.add('flash');
+    });
+    /* 寄存器 */
+    const rl = $('reglist');
+    if (!rl.hasChildNodes()){
+      R8.forEach(function(r){
+        const row = document.createElement('div');
+        row.className = 'regrow';
+        row.innerHTML = '<span class="rn">%' + r + '</span>';
+        const inp = document.createElement('input');
+        inp.type = 'text'; inp.id = 'rg-' + r;
+        inp.addEventListener('change', function(){
+          REG_INIT[r] = parseV(inp.value);
+          loadSim(false);
+        });
+        row.appendChild(inp); rl.appendChild(row);
+      });
+    }
+    R8.forEach(function(r){
+      const inp = $('rg-' + r);
+      if (document.activeElement !== inp) inp.value = fmtV(snapS.regs[r]);
+      const cell = inp.parentElement;
+      cell.classList.toggle('flash', !!(d && d.regs.indexOf(r) >= 0));
+    });
+    /* 指令内存 */
+    const enc = simData.enc;
+    let im = '';
+    enc.forEach(function(b, i){
+      let cls = i === 0 ? 'op' : (i === 1 && enc.length >= 2 ? 'rg' : '');
+      if (enc.length >= 9 && i >= (enc.length === 9 ? 1 : 2)) cls = 'vc';
+      if (i === 1 && enc.length === 2) cls = 'rg';
+      im += '<span class="btag ' + cls + '">' + b.toString(16).padStart(2,'0').toUpperCase() + '</span>';
+    });
+    $('imem').innerHTML = '<span class="btag" style="border:none;color:var(--muted)">0x100&nbsp;▸</span>' + im;
+    $('ilen').textContent = enc.length;
+    /* 数据内存 */
+    const base = memWindow(simIns);
+    let dm = '';
+    for (let i = 0n; i < 11n; i++){
+      const addr = base + i*8n;
+      const isRsp = (u64(addr) === (u64(snapS.regs.rsp) & ~7n)) ||
+                    (snapS.regs.rsp >= addr && snapS.regs.rsp < addr + 8n);
+      const v = rd64(snapS.mem, addr);
+      const hit = d && d.mem.some(function(w){ return u64(w) === u64(addr); });
+      dm += '<div class="memrow' + (isRsp?' stack':'') + (hit?' flash':'') + '"><span class="ma">' + fmtAddr(addr) + '</span><span>' + fmtV(v) + '</span></div>';
+    }
+    $('dmem').innerHTML = dm;
+  }
+
+  /* 步进条 */
+  function renderStepper(){
+    const sp = $('stepper');
+    sp.innerHTML = STG_ORDER.map(function(k, i){
+      const done = simIdx > i, cur = simIdx === i+1;
+      return '<button class="stepdot' + (done?' done':'') + (cur?' cur':'') + '" data-i="' + (i+1) + '" style="--sc:' + cssVar(k) + '">' +
+        '<span class="sl">' + k + '</span><span class="szh">' + stgByK[k].n + '</span></button>';
+    }).join('');
+    Array.prototype.forEach.call(sp.querySelectorAll('.stepdot'), function(btn){
+      btn.addEventListener('click', function(){
+        const i = parseInt(btn.getAttribute('data-i'), 10);
+        if (i <= simData.steps.length){ simIdx = i; renderAll(); }
+      });
+    });
+  }
+
+  /* 数据通路图高亮 + 流动脉冲 */
+  const ARROW_OF = {F:'ar0', D:'ar1', E:'ar2', M:'ar3', W:'ar4', P:'ar5'};
+  const LBL_OF = {F:null, D:'l1', E:'l2', M:'l3', W:'l4', P:'l5'};
+  const BOX_POS = {F:[206,62], D:[372,62], E:[538,62], M:[704,62], W:[870,62], P:[538,213]};
+  let pulseAnim = null;
+  function movePulseTo(x, y){
+    const c = $('pulse');
+    if (pulseAnim) cancelAnimationFrame(pulseAnim);
+    const x0 = Number(c.getAttribute('cx')), y0 = Number(c.getAttribute('cy'));
+    const t0 = performance.now();
+    function step(ts){
+      const p = Math.min(1, (ts - t0) / 350);
+      const e = 1 - Math.pow(1 - p, 3);
+      c.setAttribute('cx', x0 + (x - x0) * e);
+      c.setAttribute('cy', y0 + (y - y0) * e);
+      if (p < 1) pulseAnim = requestAnimationFrame(step);
+    }
+    pulseAnim = requestAnimationFrame(step);
+  }
+  function renderDiagram(){
+    const k = curStageK();
+    ['PC','F','D','E','M','W','P','CC'].forEach(function(id){
+      $('bx-' + id).classList.remove('on', 'warm');
+    });
+    ['ar0','ar1','ar2','ar3','ar4','ar5','ar6'].forEach(function(id){ $(id).classList.remove('on'); });
+    ['l1','l2','l3','l4','l5','l6'].forEach(function(id){ $(id).classList.remove('on'); });
+    const pulse = $('pulse');
+    if (!k){
+      $('bx-PC').classList.add('warm');
+      pulse.style.fill = 'var(--muted)';
+      movePulseTo(59, 62);
+      return;
+    }
+    const bx = $('bx-' + (k === 'P' ? 'P' : k));
+    bx.classList.add('on'); bx.style.setProperty('--sc', cssVar(k));
+    if (k === 'E') { $('bx-CC').classList.add('on'); $('bx-CC').style.setProperty('--sc', cssVar('E')); }
+    if (k === 'F' || k === 'P') $('bx-PC').classList.add('warm');
+    const ar = ARROW_OF[k];
+    if (ar){ const el = $(ar); el.classList.add('on'); el.style.setProperty('--sc', cssVar(k)); }
+    const lb = LBL_OF[k];
+    if (lb){ const el = $(lb); el.classList.add('on'); el.style.setProperty('--sc', cssVar(k)); }
+    if (k === 'P'){ const el = $('l6'); el.classList.add('on'); el.style.setProperty('--sc', cssVar('P')); }
+    pulse.style.fill = cssVar(k);
+    const pos = BOX_POS[k];
+    movePulseTo(pos[0], pos[1]);
+  }
+
+  /* 阶段讲解面板 */
+  function renderStagePanel(){
+    const panel = $('stagepanel');
+    if (simIdx === 0){
+      panel.innerHTML =
+        '<div class="stagehead"><span class="scn" style="color:var(--brand)">准备就绪</span>' +
+        '<span class="motto">PC=' + fmtAddr(simData.snaps[0].pc) + '，点「下一步」开始取指</span></div>' +
+        '<div class="rtl-line" style="border-left-color:var(--brand)">即将执行：' + DESC[simIns.type].title + '　（' + simData.enc.length + ' 字节）</div>' +
+        '<div class="stnote">' + DESC[simIns.type].special + '</div>';
+      return;
+    }
+    const stp = simData.steps[simIdx-1];
+    const k = stp.k;
+    const stg = stgByK[k];
+    let h = '<div class="stagehead"><span class="scn" style="color:' + cssVar(k) + '">' + k + ' · ' + stg.n + '</span>' +
+      '<span class="motto">' + stg.motto + '</span></div>';
+    h += stp.rtl.map(function(l){ return '<div class="rtl-line">' + l + '</div>'; }).join('');
+    h += '<div style="margin:6px 0 2px;font-size:12px;color:var(--muted)">代入本例数值：</div>';
+    h += stp.calc.map(function(l){ return '<div class="calc-line">▸ ' + l + '</div>'; }).join('');
+    if (stp.produce.length){
+      h += '<div class="chiprow" style="margin-top:8px"><span style="font-size:12px;color:var(--muted)">本阶段产出：</span>' +
+        stp.produce.map(function(p){ return '<span class="schip fill">' + p + '</span>'; }).join('') + '</div>';
+    }
+    if (stp.note) h += '<div class="stnote">💡 ' + stp.note + '</div>';
+    if (simIdx === 6){
+      const env = simData.env;
+      const pi = portInfo(simIns);
+      const rows = [
+        ['新 PC', fmtAddr(simData.newPC)],
+        ['icode:ifun', env.icode + ':' + env.ifun],
+        ['rA / rB', (env.rA ? '%' + env.rA : '—') + ' / ' + (env.rB ? '%' + env.rB : '—')],
+        ['valC', env.valC !== undefined ? fmtV(env.valC) : '（无）'],
+        ['valP', env.valP !== undefined ? fmtV(env.valP) : '—'],
+        ['valA', env.valA !== undefined ? fmtV(env.valA) : '（无）'],
+        ['valB', env.valB !== undefined ? fmtV(env.valB) : '（无）'],
+        ['valE', env.valE !== undefined ? fmtV(env.valE) : '（无）'],
+        ['Cnd', env.Cnd !== undefined ? String(env.Cnd) : '（无）'],
+        ['valM', env.valM !== undefined ? fmtV(env.valM) : '（无）'],
+        ['srcA / srcB', pi.srcA + ' / ' + pi.srcB],
+        ['dstE / dstM', pi.dstE + ' / ' + pi.dstM],
+        ['Stat', simData.stat]
+      ];
+      h += '<div class="okbox" style="margin-top:10px">✔ 指令执行完毕：' + DESC[simIns.type].title +
+        '。六个阶段全信号终值如下，可回头点上方步进条复习任意一步。</div>';
+      h += '<table class="sumtable">' + rows.map(function(r){
+        return '<tr><td>' + r[0] + '</td><td class="mono">' + r[1] + '</td></tr>'; }).join('') + '</table>';
+    }
+    panel.innerHTML = h;
+  }
+
+  /* 控件事件 */
+  $('selType').addEventListener('change', function(){
+    const t = $('selType').value;
+    simIns = Object.assign({}, DEFINS[t]);
+    loadSim(false);
+  });
+  $('selFn').addEventListener('change', function(){ simIns.fn = parseInt($('selFn').value, 10); loadSim(false); });
+  $('selRA').addEventListener('change', function(){ simIns.rA = $('selRA').value; loadSim(false); });
+  $('selRB').addEventListener('change', function(){ simIns.rB = $('selRB').value; loadSim(false); });
+  $('inVC').addEventListener('change', function(){ simIns.valC = parseV($('inVC').value); loadSim(false); });
+  $('quickrow').innerHTML = QUICK.map(function(q, i){
+    return '<button data-i="' + i + '">' + q.label + '</button>'; }).join('');
+  Array.prototype.forEach.call($('quickrow').querySelectorAll('button'), function(btn){
+    btn.addEventListener('click', function(){
+      simIns = Object.assign({}, QUICK[parseInt(btn.getAttribute('data-i'), 10)].ins);
+      loadSim(false);
+    });
+  });
+  $('btnPrev').addEventListener('click', function(){ if (simIdx > 0){ simIdx--; renderAll(); } });
+  $('btnNext').addEventListener('click', function(){ if (simIdx < 6){ simIdx++; renderAll(); } });
+  $('btnReset').addEventListener('click', function(){ stopAuto(); loadSim(false); });
+  function stopAuto(){
+    if (autoTimer){ clearInterval(autoTimer); autoTimer = null; $('btnAuto').textContent = '⏵ 自动播放'; }
+  }
+  $('btnAuto').addEventListener('click', function(){
+    if (autoTimer){ stopAuto(); return; }
+    if (simIdx >= 6) simIdx = 0;
+    $('btnAuto').textContent = '⏸ 停止';
+    autoTimer = setInterval(function(){
+      if (simIdx >= 6){ stopAuto(); return; }
+      simIdx++; renderAll();
+    }, 1400);
+  });
+  document.addEventListener('keydown', function(e){
+    const tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+    if (e.key === 'ArrowRight' && simIdx < 6){ simIdx++; renderAll(); }
+    if (e.key === 'ArrowLeft' && simIdx > 0){ simIdx--; renderAll(); }
+  });
+
+  /* ---------- ④ 指令×阶段 ---------- */
+  (function(){
+    let h = '<tr><th>指令（点击试跑）</th><th>F 取指</th><th>D 译码</th><th>E 执行</th><th>M 访存</th><th>W 写回</th><th>PC 更新</th></tr>';
+    ORDER.forEach(function(t){
+      h += '<tr><td class="iname" data-t="' + t + '">' + DESC[t].title.split(' — ')[0] + '</td>';
+      STG_ORDER.forEach(function(k){
+        const sum = DESC[t].stages[k].sum;
+        h += sum === '—' || sum.indexOf('—') === 0
+          ? '<td class="dim">—</td>'
+          : '<td class="has">' + sum + '</td>';
+      });
+      h += '</tr>';
+    });
+    $('insttable').innerHTML = h;
+    Array.prototype.forEach.call($('insttable').querySelectorAll('.iname'), function(td){
+      td.addEventListener('click', function(){ selectIns(td.getAttribute('data-t')); });
+    });
+    $('ichips').innerHTML = ORDER.map(function(t){
+      return '<button data-t="' + t + '">' + t + '</button>'; }).join('');
+    Array.prototype.forEach.call($('ichips').querySelectorAll('button'), function(btn){
+      btn.addEventListener('click', function(){ selectIns(btn.getAttribute('data-t')); });
+    });
+  })();
+  function selectIns(t){
+    Array.prototype.forEach.call($('ichips').querySelectorAll('button'), function(btn){
+      btn.classList.toggle('act', btn.getAttribute('data-t') === t);
+    });
+    const dd = DESC[t];
+    let h = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">' +
+      '<h3 style="margin:0">' + dd.title + '</h3><span class="schip">' + dd.enc + '</span></div>' +
+      '<div class="tipbox" style="margin:4px 0 10px">⚠️ 考点：' + dd.special + '</div>' +
+      '<div class="detailgrid">' + STG_ORDER.map(function(k){
+        const ds = dd.stages[k];
+        return '<div class="dstg' + (ds.rtl.length === 1 && ds.rtl[0].indexOf('空') >= 0 ? ' empty' : '') + '" style="--sc:' + cssVar(k) + '">' +
+          '<h5>' + k + ' · ' + stgByK[k].n + '</h5>' +
+          ds.rtl.map(function(l){ return '<div class="rl">' + l + '</div>'; }).join('') +
+          (ds.produce.length ? '<div class="chiprow" style="margin-top:4px">' + ds.produce.map(function(p){ return '<span class="schip fill" style="font-size:11px">' + p + '</span>'; }).join('') + '</div>' : '') +
+          '</div>';
+      }).join('') + '</div>' +
+      '<div style="margin-top:12px"><button class="btn main" id="tryInSim">▶ 到模拟器里单步跑这条指令</button></div>';
+    $('idetail').innerHTML = h;
+    $('tryInSim').addEventListener('click', function(){
+      simIns = Object.assign({}, DEFINS[t]);
+      loadSim(false);
+      $('sim').scrollIntoView({behavior:'smooth'});
+    });
+  }
+  selectIns('call');
+
+  /* ---------- ⑤ 控制逻辑 HCL ---------- */
+  function initHcl(){
+    const tabs = $('hcltabs');
+    Array.prototype.forEach.call(tabs.querySelectorAll('button'), function(btn){
+      btn.addEventListener('click', function(){
+        Array.prototype.forEach.call(tabs.querySelectorAll('button'), function(b){ b.classList.toggle('act', b === btn); });
+        renderHcl(btn.getAttribute('data-t'));
+      });
+    });
+    renderHcl('port');
+  }
+  function renderHcl(which){
+    let h = '';
+    if (which === 'port'){
+      h += '<div class="hclcode">int srcA = [\n    icode in { IRRMOVQ, IRMMOVQ, IOPQ, IPUSHQ } : rA;\n    icode in { IPOPQ, IRET } : RRSP;\n    1 : RNONE;    # 15，不读任何寄存器\n];\nint srcB = [\n    icode in { IOPQ, IRMMOVQ, IMRMOVQ } : rB;\n    icode in { IPUSHQ, IPOPQ, ICALL, IRET } : RRSP;\n    1 : RNONE;\n];\nint dstE = [\n    icode in { IRRMOVQ, IOPQ, IIRMOVQ } : rB;\n    icode in { IPUSHQ, IPOPQ, ICALL, IRET } : RRSP;\n    1 : RNONE;\n];\nint dstM = [\n    icode in { IMRMOVQ, IPOPQ } : rA;\n    1 : RNONE;\n];</div>';
+      h += '<div class="mxwrap"><table class="ptab"><tr><th>指令</th><th>srcA（读端口A）</th><th>srcB（读端口B）</th><th>dstE（写ALU结果）</th><th>dstM（写内存数据）</th><th>口诀</th></tr>';
+      ORDER.forEach(function(t){
+        const p = PORTS[t];
+        const f = function(v){ return v ? esc(v) : '<span style="color:var(--muted)">RNONE</span>'; };
+        h += '<tr><td class="inm">' + t + '</td><td>' + f(p.srcA) + '</td><td>' + f(p.srcB) + '</td><td>' + f(p.dstE) + '</td><td>' + f(p.dstM) + '</td><td class="tipc">' + p.tip + '</td></tr>';
+      });
+      h += '</table></div>';
+      h += '<div class="tipbox">📌 读端口在译码阶段用（决定 valA/valB 是谁的值）；写端口在写回阶段用：dstE 收 ALU 结果 valE，dstM 收内存读数 valM——只有 mrmovq 和 popq 用 dstM。规律：凡跟栈打交道的指令（call/ret/pushq/popq），%rsp 必出现在端口表里。</div>';
+    } else if (which === 'alu'){
+      h += '<div class="tipbox" style="margin-top:0">💡 <b>统一律：所有指令的 valE 都是 valE = aluB + aluA 一条公式</b>——"栈指针减 8"不是特殊运算，而是把 −8 当作 ALU 的 A 输入、让 ALU 照常做加法。ALU 只在 OPq 时按 ifun 选运算，其余恒做加法。</div>';
+      h += '<div class="hclcode">int aluA = [\n    icode in { IRRMOVQ, IOPQ } : valA;      # 直通 / 第二操作数\n    icode in { IIRMOVQ, IRMMOVQ, IMRMOVQ } : valC;   # 直通 / 地址位移\n    icode in { ICALL, IPUSHQ } : -8;         # 栈指针减小\n    icode in { IRET, IPOPQ }  : +8;          # 栈指针增大\n    1 : 0;                                   # 不需要 ALU\n];\nint aluB = [\n    icode in { IRMMOVQ, IMRMOVQ, IOPQ, ICALL,\n               IPUSHQ, IRET, IPOPQ } : valB;\n    1 : 0;                                   # rrmovq/irmovq 用 0 当另一路\n];\nint alufun = [ icode == IOPQ : ifun;  1 : ALUADD; ];</div>';
+      h += '<div class="mxwrap"><table class="ptab"><tr><th>指令</th><th>aluA</th><th>aluB</th><th>ALU 功能</th><th>含义</th></tr>';
+      ALUTAB.forEach(function(a){
+        h += '<tr><td class="inm">' + esc(a.t) + '</td><td>' + esc(a.a) + '</td><td>' + esc(a.b) + '</td><td>' + esc(a.f) + '</td><td class="tipc">' + esc(a.m) + '</td></tr>';
+      });
+      h += '</table></div>';
+      h += '<div class="okbox">✔ 这解释了 ③ 模拟器里 rrmovq 的 "0 + valA"：写回端口的值只能来自 ALU 输出，与其加旁路不如复用加法器。</div>';
+    } else if (which === 'mem'){
+      h += '<div class="hclcode">int mem_addr = [\n    icode in { IRMMOVQ, IPUSHQ, ICALL, IMRMOVQ } : valE;\n    icode in { IPOPQ, IRET } : valA;         # 旧栈顶\n    # 其他指令不需要地址\n];\nint mem_data = [\n    icode in { IRMMOVQ, IPUSHQ } : valA;\n    icode == ICALL : valP;                   # 压入返回地址\n];\nbool mem_read  = icode in { IMRMOVQ, IPOPQ, IRET };\nbool mem_write = icode in { IRMMOVQ, IPUSHQ, ICALL };</div>';
+      h += '<div class="mxwrap"><table class="ptab"><tr><th>指令</th><th>读？</th><th>写？</th><th>地址来源</th><th>数据来源</th><th>操作</th></tr>';
+      MEMTAB.forEach(function(m){
+        h += '<tr><td class="inm">' + esc(m.t) + '</td><td>' + (m.rd?'●读':'—') + '</td><td>' + (m.wr?'●写':'—') + '</td><td>' + esc(m.addr) + '</td><td>' + esc(m.data) + '</td><td class="tipc">' + esc(m.m) + '</td></tr>';
+      });
+      h += '</table></div>';
+      h += '<div class="tipbox">📌 mem_read 与 mem_write 永远不同时为 1。注意 popq/ret 读内存用的是 <b>valA（旧栈顶）</b>而不是 valE（新栈顶）——先弹后加的顺序语义。</div>';
+    } else {
+      h += '<div class="hclcode">int new_pc = [\n    icode == ICALL          : valC;     # 无条件跳目标\n    icode == IJXX && Cnd    : valC;     # 条件成立才跳\n    icode == IRET           : valM;     # 返回地址来自内存\n    1                       : valP;     # 默认顺序执行\n];</div>';
+      h += '<div class="hclcode">int Stat = [\n    imem_error || dmem_error : SADR;    # 地址非法（取指/数据）\n    !instr_valid            : SINS;    # 非法指令\n    icode == IHALT          : SHLT;    # 停机\n    1                       : SAOK;    # 正常\n];</div>';
+      h += '<div class="tipbox">📌 三个易考细节：① jmp 的 Cnd 恒为 1，所以统一写成 "Cnd ? valC : valP" 不用特判；② cmovXX 的"条件"体现在 dstE：Cnd=0 时 dstE=RNONE，写端口关闭；③ popq %rsp 时 dstE=dstM 冲突，<b>valM 优先</b>（按顺序语义应装栈顶内容）。Stat 的判断顺序也是考点：地址错 &gt; 非法指令 &gt; 停机 &gt; 正常。</div>';
+      h += '<div class="okbox">🔗 通往流水线：SEQ 时钟要等六阶段全部走完。SEQ+ 把"算 PC"挪到取指（算的是下一条的预测地址 predPC，PC 寄存器消失但程序员不可见）；再插上 F/D/E/M/W 五组流水线寄存器并配上转发/暂停/气泡控制，就得到 ⑦ 的 PIPE——信号也随之改名：D_icode（流水线寄存器送来的，大写前缀）与 e_valE（本阶段刚产生的，小写前缀）。</div>';
+    }
+    $('hclbody').innerHTML = h;
+  }
+  initHcl();
+
+  /* ---------- ⑥ 流水线性能计算器 ---------- */
+  function initPerf(){
+    const upd = function(){
+      const L = +$('inL').value, r = +$('inR').value, k = +$('inK').value;
+      $('vL').textContent = L; $('vR').textContent = r; $('vK').textContent = k;
+      const clock = L/k + r, lat = L + k*r, thr = 1000/clock, base = 1000/(L + r);
+      $('oClock').textContent = (clock >= 100 ? Math.round(clock) : clock.toFixed(1)) + ' ps';
+      $('oLat').textContent = Math.round(lat) + ' ps';
+      $('oThr').textContent = thr.toFixed(2) + ' GIPS';
+      $('oSpd').textContent = (thr/base).toFixed(2) + '×';
+      $('oReg').textContent = (k*r/lat*100).toFixed(1) + '%';
+      drawPerf(L, r, k);
+    };
+    ['inL','inR','inK'].forEach(function(id){ $(id).addEventListener('input', upd); });
+    upd();
+  }
+  function drawPerf(L, r, k){
+    const svg = $('perfsvg');
+    const sc = 900 / (L + k*r);
+    const combW = Math.max(10, L/k*sc), regW = Math.max(4, r*sc);
+    let x = 30, h = '';
+    for (let i = 0; i < k; i++){
+      h += '<rect x="' + x + '" y="46" width="' + (combW-2) + '" height="40" rx="6" fill="var(--brand-weak)" stroke="var(--brand-line)"/>';
+      h += '<text x="' + (x + combW/2 - 1) + '" y="70" text-anchor="middle" font-size="12" fill="var(--brand)">段' + (i+1) + '</text>';
+      x += combW;
+      h += '<rect x="' + x + '" y="46" width="' + regW + '" height="40" fill="var(--warn)" opacity=".5" rx="2"/>';
+      x += regW;
+    }
+    const period = (L/k + r) * sc;
+    for (let c = 0; c <= k + 2; c++){
+      const tx = 30 + c * period;
+      if (tx > 950) break;
+      h += '<line x1="' + tx + '" y1="96" x2="' + tx + '" y2="116" stroke="var(--muted)" stroke-dasharray="3 3" opacity=".6"/>';
+      h += '<text x="' + tx + '" y="130" text-anchor="middle" font-size="11" fill="var(--muted)">' + c + '</text>';
+    }
+    h += '<text x="30" y="28" font-size="12" fill="var(--muted)">蓝色=组合逻辑段（各 L/k=' + (L/k).toFixed(1) + 'ps），黄色=流水线寄存器（r=' + r + 'ps）；虚线=时钟上升沿，每周期 = L/k+r = ' + (L/k+r).toFixed(1) + 'ps</text>';
+    h += '<text x="30" y="147" font-size="11" fill="var(--muted)">对照未流水（k=1）：时钟 ' + (L+r) + 'ps、吞吐 ' + (1000/(L+r)).toFixed(2) + ' GIPS</text>';
+    svg.innerHTML = h;
+  }
+  initPerf();
+
+  /* ---------- ⑦ 冒险实验室 ---------- */
+  function initPipe(){
+    let cur = PP_RESETS[0], run = null, cyc = 0, timer = null;
+    $('ppsel').innerHTML = PP_RESETS.map(function(p, i){
+      return '<button data-i="' + i + '"' + (i === 0 ? ' class="act"' : '') + '>' + p.name + '</button>';
+    }).join('');
+    Array.prototype.forEach.call($('ppsel').querySelectorAll('button'), function(btn){
+      btn.addEventListener('click', function(){
+        Array.prototype.forEach.call($('ppsel').querySelectorAll('button'), function(b){ b.classList.toggle('act', b === btn); });
+        cur = PP_RESETS[parseInt(btn.getAttribute('data-i'), 10)];
+        loadPipe();
+      });
+    });
+    const fwdOn = function(){ return cur.fwdLock ? true : $('fwdToggle').checked; };
+    function syncFwdUi(){
+      const on = fwdOn();
+      $('fwdWrap').classList.toggle('on', on);
+      $('fwdWrap').classList.toggle('lock', !!cur.fwdLock);
+      $('fwdToggle').checked = on;
+      $('fwdToggle').disabled = !!cur.fwdLock;
+      $('fwdWrap').childNodes[1].textContent = on ? '🔄 数据转发开启' : '⛔ 数据转发关闭';
+    }
+    $('fwdToggle').addEventListener('change', function(){ loadPipe(); });
+    function stopAuto(){
+      if (timer){ clearInterval(timer); timer = null; $('pAuto').textContent = '⏵ 自动播放'; }
+    }
+    function loadPipe(){
+      stopAuto();
+      syncFwdUi();
+      run = runPipe(cur.prog, fwdOn());
+      cyc = 0;
+      renderPipe();
+    }
+    function renderPipe(){
+      const total = run.total;
+      const retiredSoFar = run.rows.filter(function(r){
+        return !r.bub && r.node && !r.node.halt && r.squashAt === null &&
+               r.doneCycle !== null && r.doneCycle <= cyc;
+      }).length;
+      $('pstats').innerHTML =
+        '<span class="pstat2">周期 <b>' + cyc + '</b> / ' + total + '</span>' +
+        '<span class="pstat2">已退出指令 <b>' + retiredSoFar + '</b></span>' +
+        '<span class="pstat2">气泡 <b>' + run.bubbles + '</b></span>' +
+        (retiredSoFar ? '<span class="pstat2">CPI（含填充/排空）<b>' + (cyc/retiredSoFar).toFixed(2) + '</b></span>' : '') +
+        (run.retired ? '<span class="pstat2">全程 CPI <b>' + (total/run.retired).toFixed(2) + '</b></span>' : '');
+      let h = '<tr><th style="text-align:left">指令 \\ 周期</th>';
+      for (let t = 1; t <= total; t++) h += '<th' + (t === cyc ? ' class="curcol"' : '') + '>' + t + '</th>';
+      h += '</tr>';
+      run.rows.forEach(function(r){
+        h += '<tr><td class="rlbl' + (r.bub ? ' bubr' : '') + '">' + (r.bub ? '●气泡' : esc(r.node.asm)) + '</td>';
+        for (let t = 1; t <= total; t++){
+          const cd = run.cycles[t-1];
+          let stageHit = null;
+          if (cd && t <= cyc){
+            ['F','D','E','M','W'].forEach(function(sk){ if (cd.st[sk] && cd.st[sk].id === r.id) stageHit = sk; });
+          }
+          let cell = '';
+          if (stageHit){
+            let tag = '';
+            if (stageHit === 'D' && cd){
+              cd.ev.filter(function(e){ return e.k === 'fwd' && e.cons === r.id; })
+                .forEach(function(e){ tag += '<span class="fwdtag">←' + esc(e.from) + '</span>'; });
+            }
+            const sq = (r.squashAt === t);
+            cell = r.bub
+              ? '<span class="pcell pcbub">' + stageHit + '</span>'
+              : '<span class="pcell pc' + stageHit + '">' + stageHit + '</span>' + tag +
+                (sq ? '<span style="color:var(--bad)">✕</span>' : '');
+            if (sq) cell = '<span style="text-decoration:line-through;opacity:.55">' + cell + '</span>';
+          }
+          h += '<td' + (t === cyc ? ' class="curcol"' : '') + '>' + cell + '</td>';
+        }
+        h += '</tr>';
+      });
+      $('pipetable').innerHTML = h;
+      $('pnote').innerHTML = '📌 ' + cur.note;
+      renderPipeEvents();
+      $('pPrev').disabled = cyc === 0;
+      $('pNext').disabled = cyc >= total;
+      $('pNext').textContent = cyc < total ? '下一周期 ▶' : '已全部完成 ✔';
+    }
+    function renderPipeEvents(){
+      const box = $('pevents');
+      if (cyc === 0){
+        box.innerHTML = '<div class="evline">点「下一周期」开始。取指预测规则：jXX / call 取 valC（预测跳转发生），其余指令取 valP。</div>';
+        return;
+      }
+      const c = run.cycles[cyc-1];
+      if (!c){ box.innerHTML = ''; return; }
+      const lines = [];
+      c.ev.forEach(function(e){
+        if (e.k === 'fwd'){
+          lines.push('<div class="evline ok">🔄 转发：' + e.to + ' ← ' + e.from + '（%' + e.reg + '，来自第 ' + (e.prod+1) + ' 行）' + (e.rf ? '——寄存器堆同拍写读（内部转发）' : '') + '</div>');
+        } else if (e.k === 'squash'){
+          lines.push('<div class="evline warn">✕ 冲刷：' + esc(e.where) + ' 中的错误路径指令作废，不会流到写回</div>');
+        } else if (e.k === 'mispred'){
+          lines.push('<div class="evline warn">⚠ 分支预测错误：E 阶段算出 Cnd=0（实际不跳），而取指时已按"跳转"预测取了错误路径 → 下周期 D、E 注气泡，从 valP 重新取指，代价 2 周期</div>');
+        } else if (e.k === 'retgo'){
+          lines.push('<div class="evline ok">🎯 ret 到达 W：返回地址 valM 就绪，冲掉冻结的错误取指，从返回地址重新取指</div>');
+        }
+      });
+      if (c.mispred) lines.push('<div class="evline warn">控制信号：F_stall=0　D_bubble=1　E_bubble=1</div>');
+      else if (c.loadUse) lines.push('<div class="evline warn">⏸ 加载/使用冒险：E 中的 mrmovq/popq 将写的寄存器恰是 D 中指令要读的 → F、D 暂停 + E 注气泡（F_stall=D_stall=1, E_bubble=1）</div>');
+      else if (c.retIn) lines.push('<div class="evline warn">⏸ ret 途经 D/E/M：F 暂停（冻结错误取指）、D 注气泡（F_stall=1, D_bubble=1）</div>');
+      else if (c.F_stall) lines.push('<div class="evline warn">⏸ 数据冒险（转发关闭）：生产者尚未走到 W → F、D 暂停等待</div>');
+      if (!lines.length) lines.push('<div class="evline">— 本周期无特殊事件，流水线正常推进</div>');
+      box.innerHTML = '<div style="font-size:13px;color:var(--muted);margin:8px 0 2px">周期 ' + cyc + ' 事件：</div>' + lines.join('');
+    }
+    $('pPrev').addEventListener('click', function(){ if (cyc > 0){ cyc--; renderPipe(); } });
+    $('pNext').addEventListener('click', function(){ if (cyc < run.total){ cyc++; renderPipe(); } });
+    $('pReset').addEventListener('click', function(){ loadPipe(); });
+    $('pAuto').addEventListener('click', function(){
+      if (timer){ stopAuto(); return; }
+      if (cyc >= run.total) cyc = 0;
+      $('pAuto').textContent = '⏸ 停止';
+      timer = setInterval(function(){
+        if (cyc >= run.total){ stopAuto(); return; }
+        cyc++; renderPipe();
+      }, 1100);
+    });
+    loadPipe();
+  }
+  initPipe();
+
+  /* ---------- ⑤ 测验 ---------- */
+  (function(){
+    const KEY = 'csapp-ch4-seq-stages-quiz';
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(KEY)) || {}; } catch(e){ saved = {}; }
+    function updChip(){
+      const done = Object.keys(saved).length;
+      const right = Object.keys(saved).filter(function(i){ return saved[i]; }).length;
+      $('qchip').textContent = '测验 ' + right + '/' + QUIZ.length + (done < QUIZ.length ? '（已答 ' + done + '）' : ' 完成');
+    }
+    $('quizlist').innerHTML = QUIZ.map(function(q, qi){
+      return '<div class="card qcard" id="q' + qi + '"><p class="qn">Q' + (qi+1) + '. ' + q.q + '</p>' +
+        q.o.map(function(o, oi){ return '<button class="opt" data-q="' + qi + '" data-o="' + oi + '">' + String.fromCharCode(65+oi) + '. ' + o + '</button>'; }).join('') +
+        '<div class="exp" id="exp' + qi + '">💡 ' + q.e + '</div></div>';
+    }).join('');
+    function mark(qi, oi){
+      const q = QUIZ[qi];
+      const card = $('q' + qi);
+      Array.prototype.forEach.call(card.querySelectorAll('.opt'), function(btn, i){
+        btn.disabled = true;
+        if (i === q.a) btn.classList.add('right');
+        else if (i === oi) btn.classList.add('wrong');
+      });
+      saved[qi] = (oi === q.a);
+      $('exp' + qi).classList.add('show');
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch(e){}
+      updChip();
+    }
+    Array.prototype.forEach.call($('quizlist').querySelectorAll('.opt'), function(btn){
+      const qi = parseInt(btn.getAttribute('data-q'), 10);
+      if (!(qi in saved)) btn.addEventListener('click', function(){ mark(qi, parseInt(btn.getAttribute('data-o'), 10)); });
+      else if (saved[qi] !== undefined){
+        /* 恢复已答状态 */
+      }
+    });
+    /* 恢复历史答题 */
+    Object.keys(saved).forEach(function(qi){
+      const q = QUIZ[qi];
+      const card = $('q' + qi);
+      Array.prototype.forEach.call(card.querySelectorAll('.opt'), function(btn, i){ btn.disabled = true; if (i === q.a) btn.classList.add('right'); });
+      $('exp' + qi).classList.add('show');
+    });
+    updChip();
+  })();
+
+  /* ---------- 模拟器初载 ---------- */
+  loadSim(false);
+}
+
+if (typeof document !== 'undefined'){
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+}
+</script>
+</body>
+</html>
