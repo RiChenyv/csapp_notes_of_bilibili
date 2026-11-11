@@ -10,3 +10,6 @@ Thumbs.db
 # Python / 临时
 __pycache__/
 *.pyc
+
+# ZCode 会话工作目录
+.zcode/
