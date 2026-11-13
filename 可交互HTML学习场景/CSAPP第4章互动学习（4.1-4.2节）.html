@@ -137,6 +137,11 @@
   .lamp.off{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,transparent)}
   .lamp.off i{background:var(--bad)}
 
+  .tbl td.idle{color:var(--muted)}
+  .tbl tr.sel td{background:var(--brand-weak)}
+  .chipbtn{font:inherit;font-size:12.5px;border:1px solid var(--line);background:var(--code-bg);color:var(--ink);border-radius:999px;padding:3px 12px;cursor:pointer}
+  .chipbtn.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .seqwhy{border-left:4px solid #d97706;background:var(--warn-bg);border-radius:6px;padding:8px 12px;margin:10px 0;font-size:13.5px}
   footer{margin-top:50px;border-top:1px solid var(--line);padding-top:16px;color:var(--muted);font-size:13px}
 </style>
 </head>
@@ -146,7 +151,7 @@
   <span class="ttl">CSAPP 第4章 · 互动学习</span>
   <a href="#scope">考试范围</a><a href="#map">知识点地图</a><a href="#sec41">§4.1 编码</a>
   <a href="#asmtool">汇编器</a><a href="#dectool">反汇编器</a><a href="#sec45">absSum</a>
-  <a href="#sec42">§4.2 HCL</a><a href="#demo410">字相等演示</a>
+  <a href="#sec42">§4.2 HCL</a><a href="#demo410">字相等演示</a><a href="#seqstage">五阶段×HCL</a>
   <span class="prog"><span id="progText">已掌握 0/15</span><span class="pbar"><i id="progBar"></i></span></span>
 </div></nav>
 
@@ -626,6 +631,28 @@ else                   out = C;</pre>
   </div>
 </section>
 
+<!-- ================= PART D：指令 × 五阶段 × HCL 信号 ================= -->
+<section id="seqstage">
+  <h2>D · 指令 × 五阶段：谁用哪个阶段、为什么 <span class="chip">延伸 · 教材 4.3 节 SEQ</span></h2>
+  <p class="hsub">先澄清一个常见误解：<b>流水线（PIPE）里每条指令都会流经全部五个阶段</b>——阶段不会"消失"。"irmovq 没有译码"的准确说法是：<b>译码阶段它不读任何寄存器</b>（srcA = srcB = RNONE，读口不使能），因为它的源操作数是立即数 valC，没东西可读。下面把每条指令在每个阶段"用到了什么、闲着什么、为什么闲着"做成可点开的矩阵。</p>
+
+  <div class="card">
+    <h3 style="margin-top:0">D1 · 指令 × 阶段矩阵（点击标签或表格行，看逐阶段讲解与"为什么没有"）</h3>
+    <div class="toolrow" id="seqChips" style="gap:6px"></div>
+    <div style="overflow-x:auto">
+      <table class="tbl" id="seqTable"></table>
+    </div>
+    <div id="seqDetail" aria-live="polite"></div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0">D2 · HCL 信号查询（不同指令下各硬件对象的取值）</h3>
+    <p class="small muted">SEQ 的行为 = 一组 case 表达式：每个信号（寄存器读口 srcA / srcB、写口 dstE / dstM、ALU 输入 aluA / aluB、运算 alufun、访存地址 mem_addr、写入数据 mem_data、条件 Cnd、新 PC……）都按 icode 查表取值。<b>读到 RNONE / 0 就意味着那部分硬件在这条指令里闲置</b>——这正是"没有某阶段"的真身。点选信号查看 HCL 描述与逐指令取值：</p>
+    <div class="toolrow" id="hclChips" style="gap:6px"></div>
+    <div id="hclOut" aria-live="polite"></div>
+  </div>
+</section>
+
 <footer>
   来源：《深入理解计算机系统》（原书第 3 版）第 4 章 4.1 节、4.2 节；编码表核对自教材图 4.2 / 图 4.4，练习题答案与官方解答逐条核对。配套《练习题整理》PDF 在桌面。
   本页为单文件离线页面，可直接转发他人，用 Edge 等现代浏览器打开即用。
@@ -1027,6 +1054,249 @@ initEq();
 runAsm();
 runDec();
 renderEq();
+</script>
+
+<script>
+/* ================= PART D：SEQ 五阶段 × HCL 信号 ================= */
+/* 指令 × 阶段矩阵数据（取值依据教材图 4-18 ～ 4-22 的 SEQ 各阶段计算表） */
+var SEQ_INS = [
+  {id:'halt', name:'halt',
+   cells:{F:'取指', D:'○', E:'○', M:'○', W:'报HLT', PC:'valP'},
+   detail:[['F 取指','icode:ifun = 0:0，无 valC，valP = PC+1'],
+     ['D 译码','不读任何寄存器（srcA = srcB = RNONE）'],
+     ['E 执行','不做运算（ALU 闲置）'],
+     ['M 访存','不访存'],
+     ['W 写回','不写寄存器；Stat 在写回阶段汇报为 HLT'],
+     ['PC 更新','valP（顺序下一条）']],
+   why:'停机指令唯一的产出是"状态变 HLT"（在 W 阶段汇报）；条件码保持不变。除取指外全部硬件闲着。'},
+  {id:'nop', name:'nop',
+   cells:{F:'取指', D:'○', E:'○', M:'○', W:'○', PC:'valP'},
+   detail:[['F 取指','icode:ifun = 1:0，valP = PC+1'],
+     ['D 译码','不读寄存器'], ['E 执行','不做运算'], ['M 访存','不访存'], ['W 写回','不写寄存器'],
+     ['PC 更新','valP']],
+   why:'字面意思"什么都不做"：占 1 字节的占位指令，五个阶段除了取指和顺序推进 PC 外全部闲置。'},
+  {id:'rrmovq', name:'rrmovq',
+   cells:{F:'取指', D:'读rA', E:'0+valA', M:'○', W:'写rB', PC:'valP'},
+   detail:[['F 取指','icode:ifun = 2:0，rA:rB，无 valC，valP = PC+2'],
+     ['D 译码','valA ← R[rA]（srcA=rA；srcB=RNONE，valB 不用）'],
+     ['E 执行','valE ← 0 + valA（aluB=0、aluA=valA、加法）——结果和 valA 相同，绕 ALU 一圈以统一硬件'],
+     ['M 访存','不访存'],
+     ['W 写回','R[rB] ← valE（dstE=rB）'],
+     ['PC 更新','valP']],
+   why:'不访存：两个操作数都在寄存器里，结果也只写寄存器，全程用不到内存。'},
+  {id:'cmov', name:'cmovXX',
+   cells:{F:'取指', D:'读rA', E:'0+valA·算Cnd', M:'○', W:'Cnd?写rB', PC:'valP'},
+   detail:[['F 取指','icode:ifun = 2:fn（fn=1~6），rA:rB，valP = PC+2'],
+     ['D 译码','valA ← R[rA]'],
+     ['E 执行','valE ← 0 + valA；同时 Cnd ← Cond(CC)——读的是之前某条 OPq 设的条件码，自己不设'],
+     ['M 访存','不访存'],
+     ['W 写回','dstE = Cnd ? rB : RNONE：条件成立才把 valE 写进 rB，否则什么都不写'],
+     ['PC 更新','valP']],
+   why:'不访存：同 rrmovq。与 rrmovq 的全部区别就两个：E 阶段多算一个 Cnd；写回变成"有条件的"。'},
+  {id:'irmovq', name:'irmovq',
+   cells:{F:'取指', D:'○ 不读', E:'0+valC', M:'○', W:'写rB', PC:'valP'},
+   detail:[['F 取指','icode:ifun = 3:0，寄存器字节 = F:rB，valC = V，valP = PC+10'],
+     ['D 译码','不读任何寄存器（srcA = srcB = RNONE）——源操作数是立即数，没东西可读'],
+     ['E 执行','valE ← 0 + valC（aluB=0、aluA=valC、加法）。注意：不设置条件码——设 CC 是 OPq 家族的专属'],
+     ['M 访存','不访存'],
+     ['W 写回','R[rB] ← valE（dstE=rB）'],
+     ['PC 更新','valP']],
+   why:'这就是你观察到的"irmovq 没有译码阶段"：准确说是译码阶段的寄存器读闲置（srcA=srcB=RNONE）——它的操作数来自 valC 而非寄存器。不访存：立即数加法全程不碰内存。'},
+  {id:'rmmovq', name:'rmmovq',
+   cells:{F:'取指', D:'读rA,rB', E:'算地址', M:'写内存', W:'○ 不写', PC:'valP'},
+   detail:[['F 取指','icode:ifun = 4:0，rA:rB，valC = D，valP = PC+10'],
+     ['D 译码','valA ← R[rA]（要存的值），valB ← R[rB]（基址）'],
+     ['E 执行','valE ← valB + valC（算有效地址 D+%rB）'],
+     ['M 访存','写内存：M[valE] ← valA'],
+     ['W 写回','不写任何寄存器（dstE = dstM = RNONE）'],
+     ['PC 更新','valP']],
+   why:'不写回：它的"结果"写进了内存而不是寄存器——产出去了内存，寄存器文件自然静默。'},
+  {id:'mrmovq', name:'mrmovq',
+   cells:{F:'取指', D:'读rB', E:'算地址', M:'读内存', W:'写rA', PC:'valP'},
+   detail:[['F 取指','icode:ifun = 5:0，rA:rB，valC = D，valP = PC+10'],
+     ['D 译码','只读 rB：valB ← R[rB]（基址）；srcA = RNONE——valA 在这条指令里没有用途'],
+     ['E 执行','valE ← valB + valC（算有效地址）'],
+     ['M 访存','读内存：valM ← M[valE]'],
+     ['W 写回','R[rA] ← valM（dstM=rA）'],
+     ['PC 更新','valP']],
+   why:'译码只读 rB 不读 rA：装载方向是"内存→寄存器"，源在内存里，寄存器侧只有基址 rB 有用。⚠️ 延伸：流水线里"本条读内存、下条就用"会造成 load/use 冒险（4.5 节讨论）。'},
+  {id:'opq', name:'OPq',
+   cells:{F:'取指', D:'读rA,rB', E:'运算+设CC', M:'○', W:'写rB', PC:'valP'},
+   detail:[['F 取指','icode:ifun = 6:fn，rA:rB，无 valC，valP = PC+2'],
+     ['D 译码','valA ← R[rA]，valB ← R[rB]'],
+     ['E 执行','valE ← valB OP valA（alufun=ifun；注意 valB 在前 valA 在后——减法是 B−A），并设置 ZF/SF/OF'],
+     ['M 访存','不访存'],
+     ['W 写回','R[rB] ← valE（dstE=rB）'],
+     ['PC 更新','valP']],
+   why:'不访存：操作数都在寄存器、结果也写寄存器。它是唯一会设置条件码的指令（呼应 3.4）。'},
+  {id:'jxx', name:'jXX',
+   cells:{F:'取指', D:'○', E:'算Cnd', M:'○', W:'○', PC:'Cnd?valC:valP'},
+   detail:[['F 取指','icode:ifun = 7:fn，无寄存器字节，valC = Dest，valP = PC+9'],
+     ['D 译码','不读任何寄存器'],
+     ['E 执行','Cnd ← Cond(CC)（判定条件来自之前的 OPq；自己不设 CC）'],
+     ['M 访存','不访存'],
+     ['W 写回','不写寄存器'],
+     ['PC 更新','Cnd ? valC : valP——条件成立跳 Dest，否则顺序走']],
+   why:'译码/访存/写回全空：它唯一的产出就是"新 PC"。所有信息（条件码 + 目标地址）都已就位，E 阶段算出 Cnd，PC 阶段做选择。'},
+  {id:'call', name:'call',
+   cells:{F:'取指', D:'读%rsp', E:'rsp−8', M:'写内存(返回地址)', W:'写%rsp', PC:'valC'},
+   detail:[['F 取指','icode:ifun = 8:0，valC = Dest，valP = PC+9（valP 就是返回地址！）'],
+     ['D 译码','只读 %rsp：valB ← R[4]（旧栈指针）'],
+     ['E 执行','valE ← valB − 8（栈指针下移 8 字节）'],
+     ['M 访存','写内存：M[valE] ← valP——把返回地址压栈'],
+     ['W 写回','R[%rsp] ← valE（dstE=RRSP）'],
+     ['PC 更新','valC（跳到被调函数）']],
+   why:'译码只读 %rsp：它需要的唯一寄存器值是旧栈指针。注意压栈压的是 valP（返回地址），不是寄存器值。'},
+  {id:'ret', name:'ret',
+   cells:{F:'取指', D:'读%rsp', E:'rsp+8', M:'读内存', W:'写%rsp', PC:'valM'},
+   detail:[['F 取指','icode:ifun = 9:0，无 valC，valP = PC+1（这个 valP 没用——PC 不是它）'],
+     ['D 译码','读 %rsp：valA ← R[4]，valB ← R[4]（两个读口都指向栈指针）'],
+     ['E 执行','valE ← valB + 8（栈指针收回 8 字节）'],
+     ['M 访存','读内存：valM ← M[valA]——从栈里读出返回地址'],
+     ['W 写回','R[%rsp] ← valE'],
+     ['PC 更新','valM（新 PC = 内存里读出来的返回地址）']],
+   why:'ret 是唯一"新 PC 来自内存"的指令——返回地址不在指令编码里，必须访存读出。所以它是五阶段真正全部用满的指令（F 取指、D/E 弹栈指针、M 读返回地址、W 写 %rsp、PC 用 valM）。'},
+  {id:'pushq', name:'pushq',
+   cells:{F:'取指', D:'读rA,%rsp', E:'rsp−8', M:'写内存', W:'写%rsp', PC:'valP'},
+   detail:[['F 取指','icode:ifun = A:0，rA:F，无 valC，valP = PC+2'],
+     ['D 译码','valA ← R[rA]（要压入的值），valB ← R[%rsp]'],
+     ['E 执行','valE ← valB − 8（aluA = −8 常数）'],
+     ['M 访存','写内存：M[valE] ← valA'],
+     ['W 写回','R[%rsp] ← valE'],
+     ['PC 更新','valP']],
+   why:'一条指令两个写入：M 阶段写内存、W 阶段写 %rsp——数据与栈指针各回各家。压栈的 −8 是 ALU 输入常数（aluA=−8），不是取自寄存器。'},
+  {id:'popq', name:'popq',
+   cells:{F:'取指', D:'读%rsp×2', E:'rsp+8', M:'读内存', W:'写%rsp+rA', PC:'valP'},
+   detail:[['F 取指','icode:ifun = B:0，rA:F，valP = PC+2'],
+     ['D 译码','读 %rsp 两次：valA ← R[4]（旧栈顶地址），valB ← R[4]'],
+     ['E 执行','valE ← valB + 8'],
+     ['M 访存','读内存：valM ← M[valA]（从旧栈顶读出数据）'],
+     ['W 写回','写两个寄存器：R[%rsp] ← valE（dstE=RRSP）且 R[rA] ← valM（dstM=rA）——Y86-64 唯一的双写回指令'],
+     ['PC 更新','valP']],
+   why:'读 %rsp 两次、写回两个寄存器：弹出既要把数据给 rA（来自内存读 valM），又要把栈指针 +8（来自 ALU 的 valE）——两条写回路径 dstM 和 dstE 同时工作。⚠️ 延伸：popq %rsp 有特殊语义（先写 valM），PIPE 里靠专门处理。'}
+];
+
+/* HCL 信号数据（依据教材 SEQ 各信号的 case 表达式） */
+var SEQ_INS_ORDER = ['rrmovq','cmov','irmovq','rmmovq','mrmovq','opq','jxx','call','ret','pushq','popq','nop','halt'];
+var SEQ_HCL = [
+  {id:'srcA', name:'srcA（A 读口：谁需要 valA）',
+   hcl:'word srcA = [\n    icode in { IRRMOVQ, IRMMOVQ, IOPQ, IPUSHQ } : rA;\n    icode in { IPOPQ, IRET }          : RRSP;   # RRSP = 4 (%rsp)\n    # 其余指令：不读\n    1 : RNONE;\n];',
+   rows:{rrmovq:'rA', cmov:'rA', irmovq:'RNONE（无）', rmmovq:'rA', mrmovq:'RNONE（无）', opq:'rA', jxx:'RNONE（无）', call:'RNONE（无）', ret:'RRSP（%rsp）', pushq:'rA', popq:'RRSP（%rsp）', nop:'RNONE', halt:'RNONE'},
+   why:'mrmovq 不需要 valA——它的地址只用 valB+valC 算，读出的数直接写 rA；irmovq/jXX/call 也没有寄存器源。读口为 RNONE 时寄存器文件的 A 口静默。'},
+  {id:'srcB', name:'srcB（B 读口：谁需要 valB）',
+   hcl:'word srcB = [\n    icode in { IOPQ, IRMMOVQ, IMRMOVQ } : rB;\n    icode in { IPUSHQ, IPOPQ, ICALL, IRET } : RRSP;\n    # 其余指令：不读\n    1 : RNONE;\n];',
+   rows:{rrmovq:'RNONE（无）', cmov:'RNONE（无）', irmovq:'RNONE（无）', rmmovq:'rB', mrmovq:'rB', opq:'rB', jxx:'RNONE（无）', call:'RRSP（%rsp）', ret:'RRSP（%rsp）', pushq:'RRSP（%rsp）', popq:'RRSP（%rsp）', nop:'RNONE', halt:'RNONE'},
+   why:'需要"第二操作数或基址"的指令读 rB；四条栈操作（push/pop/call/ret）统一改读 %rsp——注意 srcB 对 pushq 是 RRSP 而不是 rB（pushq 的寄存器字节里 rB 槽填的是 F）。'},
+  {id:'dstE', name:'dstE（E 写口：执行结果写回谁）',
+   hcl:'word dstE = [\n    icode in { IRRMOVQ } && Cnd : rB;   # cmovXX：条件成立才写\n    icode in { IOPQ }           : rB;\n    icode in { IPUSHQ, IPOPQ, ICALL, IRET } : RRSP;\n    1 : RNONE;\n];',
+   rows:{rrmovq:'rB', cmov:'Cnd ? rB : RNONE', irmovq:'rB', rmmovq:'RNONE（无）', mrmovq:'RNONE（无）', opq:'rB', jxx:'RNONE（无）', call:'RRSP（%rsp）', ret:'RRSP（%rsp）', pushq:'RRSP（%rsp）', popq:'RRSP（%rsp）', nop:'RNONE', halt:'RNONE'},
+   why:'谁的执行结果要写进寄存器。cmovXX 的写入是条件的——写在 case 里直接用 && Cnd 表达"条件不成立就不写"；rmmovq 的结果去了内存，所以没有 dstE。'},
+  {id:'dstM', name:'dstM（M 写口：内存读出的值写回谁）',
+   hcl:'word dstM = [\n    icode in { IMRMOVQ, IPOPQ } : rA;\n    1 : RNONE;\n];',
+   rows:{rrmovq:'RNONE', cmov:'RNONE', irmovq:'RNONE', rmmovq:'RNONE', mrmovq:'rA', opq:'RNONE', jxx:'RNONE', call:'RNONE', ret:'RNONE', pushq:'RNONE', popq:'rA', nop:'RNONE', halt:'RNONE'},
+   why:'只有"从内存装载数据进寄存器"的指令（mrmovq、popq）需要 M 写口。popq 同时有 dstE（%rsp+8）和 dstM（rA←数据）——唯一双写回。'},
+  {id:'aluA', name:'aluA（ALU 的 A 输入）',
+   hcl:'word aluA = [\n    icode in { IRRMOVQ, IOPQ } : valA;\n    icode in { IIRMMOVQ, IRMMOVQ, IMRMOVQ, IJXX, ICALL } : valC;\n    icode == IPUSHQ : -8;\n    icode in { IPOPQ, IRET } : 8;\n    # 其余指令不需要 ALU\n    1 : 0;\n];',
+   rows:{rrmovq:'valA', cmov:'valA', irmovq:'valC', rmmovq:'valC', mrmovq:'valC', opq:'valA', jxx:'valC（不用）', call:'valC', ret:'8', pushq:'−8', popq:'8', nop:'0（不用）', halt:'0（不用）'},
+   why:'A 端三种来源：寄存器源用 valA、立即数/地址/跳转目标用 valC、栈操作用常数 ±8（加减栈指针，常数来自 ALU 输入而非寄存器）。'},
+  {id:'aluB', name:'aluB（ALU 的 B 输入）',
+   hcl:'word aluB = [\n    icode in { IOPQ, IRMMOVQ, IMRMOVQ, ICALL, IPUSHQ, IPOPQ, IRET } : valB;\n    icode in { IRRMOVQ, IIRMMOVQ } : 0;\n    # 其余指令不需要 ALU\n    1 : 0;\n];',
+   rows:{rrmovq:'0', cmov:'0', irmovq:'0', rmmovq:'valB', mrmovq:'valB', opq:'valB', jxx:'0（不用）', call:'valB（%rsp）', ret:'valB（%rsp）', pushq:'valB（%rsp）', popq:'valB（%rsp）', nop:'0（不用）', halt:'0（不用）'},
+   why:'需要"基址/第二操作数"的指令给 valB；rrmovq 和 irmovq 给常数 0——这样 0+valA、0+valC 统一走同一个加法器，硬件省一套通路（这就是它们"执行阶段"的样子）。'},
+  {id:'alufun', name:'alufun（ALU 做什么运算）',
+   hcl:'word alufun = [\n    icode == IOPQ : ifun;   # add/sub/and/xor\n    1 : 1;                  # 其余统一 ADD\n];',
+   rows:{rrmovq:'ADD（fn=0）', cmov:'ADD', irmovq:'ADD', rmmovq:'ADD', mrmovq:'ADD', opq:'ifun（运算本意）', jxx:'ADD（不用）', call:'ADD', ret:'ADD', pushq:'ADD', popq:'ADD', nop:'ADD（不用）', halt:'ADD（不用）'},
+   why:'只有 OPq 真正切换运算种类；其余一切"需要 ALU"的场景都是加法（算地址、加/减栈指针、0+valA）——所以默认值取 ADD。'},
+  {id:'mem_addr', name:'mem_addr（访存地址）',
+   hcl:'word mem_addr = [\n    icode in { IRMMOVQ, IPUSHQ, ICALL, IMRMOVQ } : valE;\n    icode in { IPOPQ, IRET } : valA;\n    # 其余指令不访存\n    1 : 0;\n];',
+   rows:{rrmovq:'—（不访存）', cmov:'—（不访存）', irmovq:'—（不访存）', rmmovq:'valE（B+D）', mrmovq:'valE（B+D）', opq:'—（不访存）', jxx:'—（不访存）', call:'valE（%rsp−8）', ret:'valA（旧 %rsp）', pushq:'valE（%rsp−8）', popq:'valA（旧 %rsp）', nop:'—', halt:'—'},
+   why:'地址两种来源：算出来的 valE（存/压/装/调用都要先做一次加法），或没做减法前的旧栈指针 valA（弹出类——先按旧地址取数）。'},
+  {id:'mem_read', name:'mem_read（读内存：产生 valM）',
+   hcl:'ivalM = icode in { IMRMOVQ, IPOPQ, IRET };   # 读使能：这三条产生 valM',
+   rows:{rrmovq:'—', cmov:'—', irmovq:'—', rmmovq:'—（只写）', mrmovq:'读 M[valE] → valM', opq:'—', jxx:'—', call:'—（只写）', ret:'读 M[valA] → valM（返回地址）', pushq:'—（只写）', popq:'读 M[valA] → valM', nop:'—', halt:'—'},
+   why:'读内存的三条指令都是"装载"方向。ret 的特殊之处：读出的 valM 不进寄存器，而是直接当新 PC。'},
+  {id:'mem_write', name:'mem_write（写内存：写入什么）',
+   hcl:'mem_write = icode in { IRMMOVQ, IPUSHQ, ICALL };   # 写使能\nword mem_data = [\n    icode in { IRMMOVQ, IPUSHQ } : valA;   # 写寄存器值\n    icode == ICALL : valP;                 # 写返回地址\n    1 : 0;\n];',
+   rows:{rrmovq:'—', cmov:'—', irmovq:'—', rmmovq:'M[valE] ← valA', mrmovq:'—（只读）', opq:'—', jxx:'—', call:'M[valE] ← valP（返回地址！）', ret:'—（只读）', pushq:'M[valE] ← valA', popq:'—（只读）', nop:'—', halt:'—'},
+   why:'写内存的三条：rmmovq/pushq 写的是寄存器值 valA，call 写的是返回地址 valP——所以 call 不需要读任何数据寄存器，只需要 %rsp。'},
+  {id:'cnd', name:'Cnd（条件判定信号）',
+   hcl:'bool Cnd = Cond(CC);   # 按 fn 查条件表：e:ZF=1  ne:ZF=0  l:SF^OF  le:(SF^OF)|ZF  ge:SF=OF  g:!ZF&&SF=OF',
+   rows:{rrmovq:'—（fn=0 恒真）', cmov:'Cond(CC)，E 阶段算出', irmovq:'—', rmmovq:'—', mrmovq:'—', opq:'—', jxx:'Cond(CC)，决定 PC', call:'—', ret:'—', pushq:'—', popq:'—', nop:'—', halt:'—'},
+   why:'只有 cmovXX 和 jXX 产生 Cnd：前者用它决定写不写 rB（dstE），后者用它决定 PC 取 valC 还是 valP。注意 CC 来自更早的 OPq——cmov/jXX 自己不设。'},
+  {id:'newpc', name:'new_pc（下一指令地址）',
+   hcl:'word new_pc = [\n    icode == ICALL : valC;\n    icode == IJXX && Cnd : valC;\n    # 其余：顺序下一条\n    1 : valP;\n];',
+   rows:{rrmovq:'valP', cmov:'valP', irmovq:'valP', rmmovq:'valP', mrmovq:'valP', opq:'valP', jxx:'Cnd ? valC : valP', call:'valC', ret:'valM（来自内存！）', pushq:'valP', popq:'valP', nop:'valP', halt:'valP（但已停机）'},
+   why:'三种去向：call 无条件跳 valC；jXX 看 Cnd；ret 的 valP 没用——新 PC 是从栈里读出的 valM。其余指令顺序前进。'},
+  {id:'setcc', name:'设置条件码（谁写 CC）',
+   hcl:'# OPq（icode == 6）执行后：ZF = 结果全 0，SF = 最高位，OF = 带符号溢出\n# cmovXX / jXX 只读不写；其余指令不碰',
+   rows:{rrmovq:'— 不设', cmov:'— 只读 CC', irmovq:'— 不设（走 ALU 但不属于 OPq 家族）', rmmovq:'— 不设', mrmovq:'— 不设', opq:'✓ 唯一设置 CC 的指令', jxx:'— 只读 CC', call:'— 不设', ret:'— 不设', pushq:'— 不设', popq:'— 不设', nop:'— 不设', halt:'— 不设'},
+   why:'呼应附录 3.4：CC 的写者只有 addq/subq/andq/xorq。irmovq 虽然走 ALU（0+valC）但不属于 OPq 家族，不设 CC——这也是它和 OPq 在执行阶段的关键区别。'}
+];
+
+/* ---- D1 渲染 ---- */
+var SEQ_SEL = 'irmovq';
+function seqIns(id){ for(var i=0;i<SEQ_INS.length;i++) if(SEQ_INS[i].id===id) return SEQ_INS[i]; return null; }
+function renderSeqMatrix(){
+  var head = '<tr><th>指令</th><th>F 取指</th><th>D 译码</th><th>E 执行</th><th>M 访存</th><th>W 写回</th><th>PC 更新</th></tr>';
+  var rows = SEQ_INS.map(function(s){
+    var c = s.cells;
+    return '<tr data-i="' + s.id + '" class="' + (s.id===SEQ_SEL?'sel':'') + '" style="cursor:pointer">' +
+      '<td class="mono">' + s.name + '</td>' +
+      '<td>' + c.F + '</td><td class="' + (c.D.indexOf('○')===0?'idle':'') + '">' + c.D + '</td>' +
+      '<td class="' + (c.E.indexOf('○')===0?'idle':'') + '">' + c.E + '</td>' +
+      '<td class="' + (c.M.indexOf('○')===0?'idle':'') + '">' + c.M + '</td>' +
+      '<td class="' + (c.W.indexOf('○')===0?'idle':'') + '">' + c.W + '</td>' +
+      '<td class="mono">' + c.PC + '</td></tr>';
+  }).join('');
+  document.getElementById('seqTable').innerHTML = head + rows;
+  var chips = SEQ_INS.map(function(s){
+    return '<button type="button" class="chipbtn' + (s.id===SEQ_SEL?' on':'') + '" data-i="' + s.id + '">' + s.name + '</button>';
+  }).join('');
+  document.getElementById('seqChips').innerHTML = chips;
+}
+function renderSeqDetail(){
+  var s = seqIns(SEQ_SEL); if(!s) return;
+  var rows = s.detail.map(function(d){ return '<tr><td style="width:82px;white-space:nowrap"><b>' + d[0] + '</b></td><td>' + d[1] + '</td></tr>'; }).join('');
+  document.getElementById('seqDetail').innerHTML =
+    '<h3 style="margin:16px 0 4px">' + s.name + ' 的逐阶段执行</h3>' +
+    '<table class="tbl">' + rows + '</table>' +
+    '<div class="seqwhy"><b>为什么这样：</b>' + s.why + '</div>';
+}
+function seqSelect(id){
+  SEQ_SEL = id; renderSeqMatrix(); renderSeqDetail();
+}
+document.getElementById('seqChips').addEventListener('click', function(ev){
+  var b = ev.target.closest('button.chipbtn'); if(b) seqSelect(b.dataset.i);
+});
+document.getElementById('seqTable').addEventListener('click', function(ev){
+  var tr = ev.target.closest('tr[data-i]'); if(tr) seqSelect(tr.dataset.i);
+});
+
+/* ---- D2 渲染 ---- */
+var HCL_SEL = 'srcA';
+function renderHcl(){
+  var s = null;
+  for(var i=0;i<SEQ_HCL.length;i++) if(SEQ_HCL[i].id===HCL_SEL) s = SEQ_HCL[i];
+  var chips = SEQ_HCL.map(function(x){
+    return '<button type="button" class="chipbtn' + (x.id===HCL_SEL?' on':'') + '" data-i="' + x.id + '">' + x.name + '</button>';
+  }).join('');
+  document.getElementById('hclChips').innerHTML = chips;
+  if(!s){ document.getElementById('hclOut').innerHTML = ''; return; }
+  var rows = SEQ_INS_ORDER.map(function(id){
+    var ins = seqIns(id);
+    return '<tr><td class="mono" style="white-space:nowrap">' + ins.name + '</td><td>' + s.rows[id] + '</td></tr>';
+  }).join('');
+  document.getElementById('hclOut').innerHTML =
+    '<pre>' + esc(s.hcl) + '</pre>' +
+    '<div class="grid2"><div><table class="tbl"><tr><th style="width:100px">指令</th><th>取值</th></tr>' + rows + '</table></div>' +
+    '<div class="seqwhy" style="margin:0"><b>为什么这样：</b>' + s.why + '</div></div>';
+}
+document.getElementById('hclChips').addEventListener('click', function(ev){
+  var b = ev.target.closest('button.chipbtn'); if(b){ HCL_SEL = b.dataset.i; renderHcl(); }
+});
+
+seqSelect('irmovq');
+renderHcl();
 </script>
 </body>
 </html>
